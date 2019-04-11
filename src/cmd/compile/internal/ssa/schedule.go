@@ -233,9 +233,13 @@ func schedule(f *Func) {
 		// Schedule highest priority value, update use counts, repeat.
 		order = order[:0]
 		tuples := make(map[ID][]*Value)
-		for priq.Len() > 0 {
+		for {
 			// Find highest priority schedulable value.
 			// Note that schedule is assembled backwards.
+
+			if priq.Len() == 0 {
+				break
+			}
 
 			v := heap.Pop(priq).(*Value)
 

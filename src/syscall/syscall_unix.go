@@ -7,7 +7,6 @@
 package syscall
 
 import (
-	"internal/oserror"
 	"internal/race"
 	"runtime"
 	"sync"
@@ -119,22 +118,6 @@ func (e Errno) Error() string {
 		}
 	}
 	return "errno " + itoa(int(e))
-}
-
-func (e Errno) Is(target error) bool {
-	switch target {
-	case oserror.ErrTemporary:
-		return e.Temporary()
-	case oserror.ErrTimeout:
-		return e.Timeout()
-	case oserror.ErrPermission:
-		return e == EACCES || e == EPERM
-	case oserror.ErrExist:
-		return e == EEXIST || e == ENOTEMPTY
-	case oserror.ErrNotExist:
-		return e == ENOENT
-	}
-	return false
 }
 
 func (e Errno) Temporary() bool {
@@ -323,11 +306,7 @@ func SetsockoptLinger(fd, level, opt int, l *Linger) (err error) {
 }
 
 func SetsockoptString(fd, level, opt int, s string) (err error) {
-	var p unsafe.Pointer
-	if len(s) > 0 {
-		p = unsafe.Pointer(&[]byte(s)[0])
-	}
-	return setsockopt(fd, level, opt, p, uintptr(len(s)))
+	return setsockopt(fd, level, opt, unsafe.Pointer(&[]byte(s)[0]), uintptr(len(s)))
 }
 
 func SetsockoptTimeval(fd, level, opt int, tv *Timeval) (err error) {

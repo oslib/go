@@ -21,7 +21,7 @@ import (
 	"sync"
 	"time"
 
-	"golang.org/x/net/http/httpguts"
+	"internal/x/net/http/httpguts"
 )
 
 // ErrLineTooLong is returned when reading request or response bodies
@@ -51,6 +51,19 @@ func (br *byteReader) Read(p []byte) (n int, err error) {
 	br.done = true
 	p[0] = br.b
 	return 1, io.EOF
+}
+
+// transferBodyReader is an io.Reader that reads from tw.Body
+// and records any non-EOF error in tw.bodyReadError.
+// It is exactly 1 pointer wide to avoid allocations into interfaces.
+type transferBodyReader struct{ tw *transferWriter }
+
+func (br transferBodyReader) Read(p []byte) (n int, err error) {
+	n, err = br.tw.Body.Read(p)
+	if err != nil && err != io.EOF {
+		br.tw.bodyReadError = err
+	}
+	return
 }
 
 // transferWriter inspects the fields of a user-supplied Request or Response,
@@ -334,18 +347,15 @@ func (t *transferWriter) writeBody(w io.Writer) error {
 	var err error
 	var ncopy int64
 
-	// Write body. We "unwrap" the body first if it was wrapped in a
-	// nopCloser. This is to ensure that we can take advantage of
-	// OS-level optimizations in the event that the body is an
-	// *os.File.
+	// Write body
 	if t.Body != nil {
-		var body = t.unwrapBody()
+		var body = transferBodyReader{t}
 		if chunked(t.TransferEncoding) {
 			if bw, ok := w.(*bufio.Writer); ok && !t.IsResponse {
 				w = &internal.FlushAfterChunkWriter{Writer: bw}
 			}
 			cw := internal.NewChunkedWriter(w)
-			_, err = t.doBodyCopy(cw, body)
+			_, err = io.Copy(cw, body)
 			if err == nil {
 				err = cw.Close()
 			}
@@ -354,14 +364,14 @@ func (t *transferWriter) writeBody(w io.Writer) error {
 			if t.Method == "CONNECT" {
 				dst = bufioFlushWriter{dst}
 			}
-			ncopy, err = t.doBodyCopy(dst, body)
+			ncopy, err = io.Copy(dst, body)
 		} else {
-			ncopy, err = t.doBodyCopy(w, io.LimitReader(body, t.ContentLength))
+			ncopy, err = io.Copy(w, io.LimitReader(body, t.ContentLength))
 			if err != nil {
 				return err
 			}
 			var nextra int64
-			nextra, err = t.doBodyCopy(ioutil.Discard, body)
+			nextra, err = io.Copy(ioutil.Discard, body)
 			ncopy += nextra
 		}
 		if err != nil {
@@ -390,31 +400,6 @@ func (t *transferWriter) writeBody(w io.Writer) error {
 		_, err = io.WriteString(w, "\r\n")
 	}
 	return err
-}
-
-// doBodyCopy wraps a copy operation, with any resulting error also
-// being saved in bodyReadError.
-//
-// This function is only intended for use in writeBody.
-func (t *transferWriter) doBodyCopy(dst io.Writer, src io.Reader) (n int64, err error) {
-	n, err = io.Copy(dst, src)
-	if err != nil && err != io.EOF {
-		t.bodyReadError = err
-	}
-	return
-}
-
-// unwrapBodyReader unwraps the body's inner reader if it's a
-// nopCloser. This is to ensure that body writes sourced from local
-// files (*os.File types) are properly optimized.
-//
-// This function is only intended for use in writeBody.
-func (t *transferWriter) unwrapBody() io.Reader {
-	if reflect.TypeOf(t.Body) == nopCloserType {
-		return reflect.ValueOf(t.Body).Field(0).Interface().(io.Reader)
-	}
-
-	return t.Body
 }
 
 type transferReader struct {

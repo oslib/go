@@ -309,6 +309,7 @@ type FD struct {
 	l sync.Mutex
 
 	// For console I/O.
+	isConsole      bool
 	lastbits       []byte   // first few bytes of the last incomplete rune in last write
 	readuint16     []uint16 // buffer to hold uint16s obtained with ReadConsole
 	readbyte       []byte   // buffer to hold decoding of readuint16 from utf16 to utf8
@@ -327,23 +328,12 @@ type FD struct {
 	// message based socket connection.
 	ZeroReadIsEOF bool
 
-	// Whether this is a file rather than a network socket.
+	// Whether this is a normal file.
 	isFile bool
 
-	// The kind of this file.
-	kind fileKind
+	// Whether this is a directory.
+	isDir bool
 }
-
-// fileKind describes the kind of file.
-type fileKind byte
-
-const (
-	kindNet fileKind = iota
-	kindFile
-	kindConsole
-	kindDir
-	kindPipe
-)
 
 // logInitFD is set by tests to enable file descriptor initialization logging.
 var logInitFD func(net string, fd *FD, err error)
@@ -360,22 +350,18 @@ func (fd *FD) Init(net string, pollable bool) (string, error) {
 
 	switch net {
 	case "file":
-		fd.kind = kindFile
+		fd.isFile = true
 	case "console":
-		fd.kind = kindConsole
+		fd.isConsole = true
 	case "dir":
-		fd.kind = kindDir
-	case "pipe":
-		fd.kind = kindPipe
-	case "tcp", "tcp4", "tcp6",
-		"udp", "udp4", "udp6",
-		"ip", "ip4", "ip6",
-		"unix", "unixgram", "unixpacket":
-		fd.kind = kindNet
+		fd.isDir = true
+	case "tcp", "tcp4", "tcp6":
+	case "udp", "udp4", "udp6":
+	case "ip", "ip4", "ip6":
+	case "unix", "unixgram", "unixpacket":
 	default:
 		return "", errors.New("internal error: unknown network type " + net)
 	}
-	fd.isFile = fd.kind != kindNet
 
 	var err error
 	if pollable {
@@ -444,14 +430,13 @@ func (fd *FD) destroy() error {
 	// so this must be executed before fd.CloseFunc.
 	fd.pd.close()
 	var err error
-	switch fd.kind {
-	case kindNet:
+	if fd.isFile || fd.isConsole {
+		err = syscall.CloseHandle(fd.Sysfd)
+	} else if fd.isDir {
+		err = syscall.FindClose(fd.Sysfd)
+	} else {
 		// The net package uses the CloseFunc variable for testing.
 		err = CloseFunc(fd.Sysfd)
-	case kindDir:
-		err = syscall.FindClose(fd.Sysfd)
-	default:
-		err = syscall.CloseHandle(fd.Sysfd)
 	}
 	fd.Sysfd = syscall.InvalidHandle
 	runtime_Semrelease(&fd.csema)
@@ -463,9 +448,6 @@ func (fd *FD) destroy() error {
 func (fd *FD) Close() error {
 	if !fd.fdmu.increfAndClose() {
 		return errClosing(fd.isFile)
-	}
-	if fd.kind == kindPipe {
-		syscall.CancelIoEx(fd.Sysfd, nil)
 	}
 	// unblock pending reader and writer
 	fd.pd.evict()
@@ -503,20 +485,13 @@ func (fd *FD) Read(buf []byte) (int, error) {
 
 	var n int
 	var err error
-	if fd.isFile {
+	if fd.isFile || fd.isDir || fd.isConsole {
 		fd.l.Lock()
 		defer fd.l.Unlock()
-		switch fd.kind {
-		case kindConsole:
+		if fd.isConsole {
 			n, err = fd.readConsole(buf)
-		default:
+		} else {
 			n, err = syscall.Read(fd.Sysfd, buf)
-			if fd.kind == kindPipe && err == syscall.ERROR_OPERATION_ABORTED {
-				// Close uses CancelIoEx to interrupt concurrent I/O for pipes.
-				// If the fd is a pipe and the Read was interrupted by CancelIoEx,
-				// we assume it is interrupted by Close.
-				err = ErrFileClosing
-			}
 		}
 		if err != nil {
 			n = 0
@@ -685,7 +660,7 @@ func (fd *FD) Write(buf []byte) (int, error) {
 		return 0, err
 	}
 	defer fd.writeUnlock()
-	if fd.isFile {
+	if fd.isFile || fd.isDir || fd.isConsole {
 		fd.l.Lock()
 		defer fd.l.Unlock()
 	}
@@ -698,18 +673,11 @@ func (fd *FD) Write(buf []byte) (int, error) {
 		}
 		var n int
 		var err error
-		if fd.isFile {
-			switch fd.kind {
-			case kindConsole:
+		if fd.isFile || fd.isDir || fd.isConsole {
+			if fd.isConsole {
 				n, err = fd.writeConsole(b)
-			default:
+			} else {
 				n, err = syscall.Write(fd.Sysfd, b)
-				if fd.kind == kindPipe && err == syscall.ERROR_OPERATION_ABORTED {
-					// Close uses CancelIoEx to interrupt concurrent I/O for pipes.
-					// If the fd is a pipe and the Write was interrupted by CancelIoEx,
-					// we assume it is interrupted by Close.
-					err = ErrFileClosing
-				}
 			}
 			if err != nil {
 				n = 0

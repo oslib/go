@@ -12,7 +12,7 @@ DWORD getthread() {
 }
 */
 import "C"
-import "runtime/testdata/testprogcgo/windows"
+import "./windows"
 
 func init() {
 	register("CgoDLLImportsMain", CgoDLLImportsMain)

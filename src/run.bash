@@ -15,10 +15,11 @@ export GOROOT   # the api test requires GOROOT to be set.
 # to point to an actual directory, it just needs to pass the semantic
 # checks performed by Go.  Use $GOROOT to define $GOPATH so that we
 # don't blunder into a user-defined symbolic link.
-export GOPATH=/dev/null
+GOPATH=$GOROOT/nonexistentpath
+export GOPATH
 
 unset CDPATH	# in case user has it set
-export GOBIN=$GOROOT/bin  # Issue 14340
+unset GOBIN     # Issue 14340
 unset GOFLAGS
 unset GO111MODULE
 

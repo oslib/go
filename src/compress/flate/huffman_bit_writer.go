@@ -609,10 +609,10 @@ func (w *huffmanBitWriter) writeTokens(tokens []token, leCodes, oeCodes []hcode)
 var huffOffset *huffmanEncoder
 
 func init() {
-	offsetFreq := make([]int32, offsetCodeCount)
-	offsetFreq[0] = 1
+	w := newHuffmanBitWriter(nil)
+	w.offsetFreq[0] = 1
 	huffOffset = newHuffmanEncoder(offsetCodeCount)
-	huffOffset.generate(offsetFreq, 15)
+	huffOffset.generate(w.offsetFreq, 15)
 }
 
 // writeBlockHuff encodes a block of bytes as either

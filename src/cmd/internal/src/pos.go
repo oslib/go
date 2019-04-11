@@ -301,19 +301,16 @@ type lico uint32
 // The bitfield order is chosen to make IsStmt be the least significant
 // part of a position; its use is to communicate statement edges through
 // instruction scrambling in code generation, not to impose an order.
-// TODO: Prologue and epilogue are perhaps better handled as pseudo-ops for the assembler,
+// TODO: Prologue and epilogue are perhaps better handled as psuedoops for the assembler,
 // because they have almost no interaction with other uses of the position.
 const (
-	lineBits, lineMax     = 20, 1<<lineBits - 2
-	bogusLine             = 1<<lineBits - 1 // Not a line number; used to disrupt infinite loops
+	lineBits, lineMax     = 20, 1<<lineBits - 1
 	isStmtBits, isStmtMax = 2, 1<<isStmtBits - 1
 	xlogueBits, xlogueMax = 2, 1<<xlogueBits - 1
 	colBits, colMax       = 32 - lineBits - xlogueBits - isStmtBits, 1<<colBits - 1
 
 	isStmtShift = 0
-	isStmtMask  = isStmtMax << isStmtShift
 	xlogueShift = isStmtBits + isStmtShift
-	xlogueMask  = xlogueMax << xlogueShift
 	colShift    = xlogueBits + xlogueShift
 	lineShift   = colBits + colShift
 )
@@ -346,7 +343,7 @@ const (
 	// positions.
 	//
 	PosDefaultStmt uint = iota // Default; position is not a statement boundary, but might be if optimization removes the designated statement boundary
-	PosIsStmt                  // Position is a statement boundary; if optimization removes the corresponding instruction, it should attempt to find a new instruction to be the boundary.
+	PosIsStmt                  // Position is a statement bounday; if optimization removes the corresponding instruction, it should attempt to find a new instruction to be the boundary.
 	PosNotStmt                 // Position should not be a statement boundary, but line should be preserved for profiling and low-level debugging purposes.
 )
 
@@ -358,16 +355,6 @@ const (
 	PosEpilogueBegin
 )
 
-func makeLicoRaw(line, col uint) lico {
-	return lico(line<<lineShift | col<<colShift)
-}
-
-// This is a not-position that will not be elided.
-// Depending on the debugger (gdb or delve) it may or may not be displayed.
-func makeBogusLico() lico {
-	return makeLicoRaw(bogusLine, 0).withIsStmt()
-}
-
 func makeLico(line, col uint) lico {
 	if line > lineMax {
 		// cannot represent line, use max. line so we have some information
@@ -378,7 +365,7 @@ func makeLico(line, col uint) lico {
 		col = colMax
 	}
 	// default is not-sure-if-statement
-	return makeLicoRaw(line, col)
+	return lico(line<<lineShift | col<<colShift)
 }
 
 func (x lico) Line() uint { return uint(x) >> lineShift }
@@ -442,8 +429,4 @@ func (x lico) lineNumberHTML() string {
 		pfx = ""
 	}
 	return fmt.Sprintf("<%s>%s%d</%s>", style, pfx, x.Line(), style)
-}
-
-func (x lico) atColumn1() lico {
-	return makeLico(x.Line(), 1) | (x & (isStmtMask | xlogueMask))
 }

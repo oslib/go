@@ -8,7 +8,6 @@ import (
 	"context"
 	"io"
 	"os"
-	"time"
 )
 
 func (c *TCPConn) readFrom(r io.Reader) (int64, error) {
@@ -45,16 +44,7 @@ func (ln *TCPListener) accept() (*TCPConn, error) {
 	if err != nil {
 		return nil, err
 	}
-	tc := newTCPConn(fd)
-	if ln.lc.KeepAlive >= 0 {
-		setKeepAlive(fd, true)
-		ka := ln.lc.KeepAlive
-		if ln.lc.KeepAlive == 0 {
-			ka = 3 * time.Minute
-		}
-		setKeepAlivePeriod(fd, ka)
-	}
-	return tc, nil
+	return newTCPConn(fd), nil
 }
 
 func (ln *TCPListener) close() error {
@@ -84,5 +74,5 @@ func (sl *sysListener) listenTCP(ctx context.Context, laddr *TCPAddr) (*TCPListe
 	if err != nil {
 		return nil, err
 	}
-	return &TCPListener{fd: fd, lc: sl.ListenConfig}, nil
+	return &TCPListener{fd}, nil
 }

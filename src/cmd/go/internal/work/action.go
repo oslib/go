@@ -248,14 +248,12 @@ func (b *Builder) Init() {
 
 	if _, ok := cfg.OSArchSupportsCgo[cfg.Goos+"/"+cfg.Goarch]; !ok && cfg.BuildContext.Compiler == "gc" {
 		fmt.Fprintf(os.Stderr, "cmd/go: unsupported GOOS/GOARCH pair %s/%s\n", cfg.Goos, cfg.Goarch)
-		base.SetExitStatus(2)
-		base.Exit()
+		os.Exit(2)
 	}
 	for _, tag := range cfg.BuildContext.BuildTags {
 		if strings.Contains(tag, ",") {
 			fmt.Fprintf(os.Stderr, "cmd/go: -tags space-separated list contains comma\n")
-			base.SetExitStatus(2)
-			base.Exit()
+			os.Exit(2)
 		}
 	}
 }
@@ -289,7 +287,7 @@ func readpkglist(shlibpath string) (pkgs []*load.Package) {
 			if strings.HasPrefix(t, "pkgpath ") {
 				t = strings.TrimPrefix(t, "pkgpath ")
 				t = strings.TrimSuffix(t, ";")
-				pkgs = append(pkgs, load.LoadImportWithFlags(t, base.Cwd, nil, &stk, nil, 0))
+				pkgs = append(pkgs, load.LoadPackage(t, &stk))
 			}
 		}
 	} else {
@@ -300,7 +298,7 @@ func readpkglist(shlibpath string) (pkgs []*load.Package) {
 		scanner := bufio.NewScanner(bytes.NewBuffer(pkglistbytes))
 		for scanner.Scan() {
 			t := scanner.Text()
-			pkgs = append(pkgs, load.LoadImportWithFlags(t, base.Cwd, nil, &stk, nil, 0))
+			pkgs = append(pkgs, load.LoadPackage(t, &stk))
 		}
 	}
 	return
@@ -405,7 +403,7 @@ func (b *Builder) vetAction(mode, depMode BuildMode, p *load.Package) *Action {
 		// vet expects to be able to import "fmt".
 		var stk load.ImportStack
 		stk.Push("vet")
-		p1 := load.LoadImportWithFlags("fmt", p.Dir, p, &stk, nil, 0)
+		p1 := load.LoadPackage("fmt", &stk)
 		stk.Pop()
 		aFmt := b.CompileAction(ModeBuild, depMode, p1)
 
@@ -705,7 +703,7 @@ func (b *Builder) linkSharedAction(mode, depMode BuildMode, shlib string, a1 *Ac
 					}
 				}
 				var stk load.ImportStack
-				p := load.LoadImportWithFlags(pkg, base.Cwd, nil, &stk, nil, 0)
+				p := load.LoadPackage(pkg, &stk)
 				if p.Error != nil {
 					base.Fatalf("load %s: %v", pkg, p.Error)
 				}

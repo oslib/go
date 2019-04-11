@@ -1,5 +1,3 @@
-env GO111MODULE=off
-
 # Integration test for cache directory calculation (cmd/go/internal/cache).
 
 [windows] skip

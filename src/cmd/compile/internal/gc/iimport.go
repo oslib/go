@@ -907,9 +907,7 @@ func (r *importReader) node() *Node {
 	// 	unreachable - mapped to OCALL case below by exporter
 
 	case OCALL:
-		n := nodl(r.pos(), OCALL, nil, nil)
-		n.Ninit.Set(r.stmtList())
-		n.Left = r.expr()
+		n := nodl(r.pos(), OCALL, r.expr(), nil)
 		n.List.Set(r.exprList())
 		n.SetIsDDD(r.bool())
 		return n

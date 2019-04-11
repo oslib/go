@@ -6,7 +6,7 @@ package tls
 
 import (
 	"fmt"
-	"golang.org/x/crypto/cryptobyte"
+	"internal/x/crypto/cryptobyte"
 	"strings"
 )
 

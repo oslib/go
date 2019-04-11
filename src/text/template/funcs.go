@@ -263,9 +263,11 @@ func call(fn reflect.Value, args ...reflect.Value) (reflect.Value, error) {
 	for i, arg := range args {
 		value := indirectInterface(arg)
 		// Compute the expected type. Clumsy because of variadics.
-		argType := dddType
+		var argType reflect.Type
 		if !typ.IsVariadic() || i < numIn-1 {
 			argType = typ.In(i)
+		} else {
+			argType = dddType
 		}
 
 		var err error

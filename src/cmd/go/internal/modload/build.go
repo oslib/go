@@ -38,6 +38,9 @@ func findStandardImportPath(path string) string {
 		if goroot.IsStandardPackage(cfg.GOROOT, cfg.BuildContext.Compiler, path) {
 			return filepath.Join(cfg.GOROOT, "src", path)
 		}
+		if goroot.IsStandardPackage(cfg.GOROOT, cfg.BuildContext.Compiler, "vendor/"+path) {
+			return filepath.Join(cfg.GOROOT, "src/vendor", path)
+		}
 	}
 	return ""
 }
@@ -216,7 +219,7 @@ func PackageBuildInfo(path string, deps []string) string {
 		if r.Path == "" {
 			h = "\t" + modfetch.Sum(mod)
 		}
-		fmt.Fprintf(&buf, "dep\t%s\t%s%s\n", mod.Path, mv, h)
+		fmt.Fprintf(&buf, "dep\t%s\t%s%s\n", mod.Path, mod.Version, h)
 		if r.Path != "" {
 			fmt.Fprintf(&buf, "=>\t%s\t%s\t%s\n", r.Path, r.Version, modfetch.Sum(r))
 		}

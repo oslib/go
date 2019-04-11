@@ -147,8 +147,8 @@ func assembleInlines(fnsym *obj.LSym, dwVars []*dwarf.Var) dwarf.InlCalls {
 
 	// Make a second pass through the progs to compute PC ranges for
 	// the various inlined calls.
-	start := int64(-1)
 	curii := -1
+	var crange *dwarf.Range
 	var prevp *obj.Prog
 	for p := fnsym.Func.Text; p != nil; prevp, p = p, p.Link {
 		if prevp != nil && p.Pos == prevp.Pos {
@@ -157,17 +157,17 @@ func assembleInlines(fnsym *obj.LSym, dwVars []*dwarf.Var) dwarf.InlCalls {
 		ii := posInlIndex(p.Pos)
 		if ii == curii {
 			continue
+		} else {
+			// Close out the current range
+			endRange(crange, p)
+
+			// Begin new range
+			crange = beginRange(inlcalls.Calls, p, ii, imap)
+			curii = ii
 		}
-		// Close out the current range
-		if start != -1 {
-			addRange(inlcalls.Calls, start, p.Pc, curii, imap)
-		}
-		// Begin new range
-		start = p.Pc
-		curii = ii
 	}
-	if start != -1 {
-		addRange(inlcalls.Calls, start, fnsym.Size, curii, imap)
+	if crange != nil {
+		crange.End = fnsym.Size
 	}
 
 	// Debugging
@@ -287,26 +287,26 @@ func posInlIndex(xpos src.XPos) int {
 	return -1
 }
 
-func addRange(calls []dwarf.InlCall, start, end int64, ii int, imap map[int]int) {
-	if start == -1 {
-		panic("bad range start")
+func endRange(crange *dwarf.Range, p *obj.Prog) {
+	if crange == nil {
+		return
 	}
-	if end == -1 {
-		panic("bad range end")
-	}
+	crange.End = p.Pc
+}
+
+func beginRange(calls []dwarf.InlCall, p *obj.Prog, ii int, imap map[int]int) *dwarf.Range {
 	if ii == -1 {
-		return
+		return nil
 	}
-	if start == end {
-		return
-	}
-	// Append range to correct inlined call
 	callIdx, found := imap[ii]
 	if !found {
-		Fatalf("can't find inlIndex %d in imap for prog at %d\n", ii, start)
+		Fatalf("can't find inlIndex %d in imap for prog at %d\n", ii, p.Pc)
 	}
 	call := &calls[callIdx]
-	call.Ranges = append(call.Ranges, dwarf.Range{Start: start, End: end})
+
+	// Set up range and append to correct inlined call
+	call.Ranges = append(call.Ranges, dwarf.Range{Start: p.Pc, End: -1})
+	return &call.Ranges[len(call.Ranges)-1]
 }
 
 func dumpInlCall(inlcalls dwarf.InlCalls, idx, ilevel int) {

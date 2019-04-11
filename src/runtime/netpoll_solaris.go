@@ -233,11 +233,6 @@ retry:
 		}
 
 		if mode != 0 {
-			// TODO(mikio): Consider implementing event
-			// scanning error reporting once we are sure
-			// about the event port on SmartOS.
-			//
-			// See golang.org/x/issue/30840.
 			netpollready(&toRun, pd, mode)
 		}
 	}

@@ -141,7 +141,10 @@ func linkpatch(ctxt *Link, sym *LSym, newprog ProgAlloc) {
 			continue
 		}
 		q := sym.Func.Text
-		for q != nil && p.To.Offset != q.Pc {
+		for q != nil {
+			if p.To.Offset == q.Pc {
+				break
+			}
 			if q.Forwd != nil && p.To.Offset >= q.Forwd.Pc {
 				q = q.Forwd
 			} else {

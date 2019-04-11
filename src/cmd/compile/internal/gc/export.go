@@ -209,10 +209,6 @@ func dumpasmhdr() {
 		}
 		switch n.Op {
 		case OLITERAL:
-			t := n.Val().Ctype()
-			if t == CTFLT || t == CTCPLX {
-				break
-			}
 			fmt.Fprintf(b, "#define const_%s %#v\n", n.Sym.Name, n.Val())
 
 		case OTYPE:

@@ -3,7 +3,7 @@
 // license that can be found in the LICENSE file.
 
 // Test broken pipes on Unix systems.
-// +build !plan9,!nacl,!js
+// +build !windows,!plan9,!nacl,!js
 
 package os_test
 
@@ -35,11 +35,6 @@ func TestEPIPE(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expect := syscall.EPIPE
-	if runtime.GOOS == "windows" {
-		// 232 is Windows error code ERROR_NO_DATA, "The pipe is being closed".
-		expect = syscall.Errno(232)
-	}
 	// Every time we write to the pipe we should get an EPIPE.
 	for i := 0; i < 20; i++ {
 		_, err = w.Write([]byte("hi"))
@@ -52,17 +47,13 @@ func TestEPIPE(t *testing.T) {
 		if se, ok := err.(*os.SyscallError); ok {
 			err = se.Err
 		}
-		if err != expect {
-			t.Errorf("iteration %d: got %v, expected %v", i, err, expect)
+		if err != syscall.EPIPE {
+			t.Errorf("iteration %d: got %v, expected EPIPE", i, err)
 		}
 	}
 }
 
 func TestStdPipe(t *testing.T) {
-	switch runtime.GOOS {
-	case "windows":
-		t.Skip("Windows doesn't support SIGPIPE")
-	}
 	testenv.MustHaveExec(t)
 	r, w, err := os.Pipe()
 	if err != nil {
@@ -204,12 +195,8 @@ func TestClosedPipeRaceWrite(t *testing.T) {
 // for unsupported file type." Currently it returns EAGAIN; it is
 // possible that in the future it will simply wait for data.
 func TestReadNonblockingFd(t *testing.T) {
-	switch runtime.GOOS {
-	case "windows":
-		t.Skip("Windows doesn't support SetNonblock")
-	}
 	if os.Getenv("GO_WANT_READ_NONBLOCKING_FD") == "1" {
-		fd := syscallDescriptor(os.Stdin.Fd())
+		fd := int(os.Stdin.Fd())
 		syscall.SetNonblock(fd, true)
 		defer syscall.SetNonblock(fd, false)
 		_, err := os.Stdin.Read(make([]byte, 1))
@@ -239,7 +226,7 @@ func TestReadNonblockingFd(t *testing.T) {
 }
 
 func TestCloseWithBlockingReadByNewFile(t *testing.T) {
-	var p [2]syscallDescriptor
+	var p [2]int
 	err := syscall.Pipe(p[:])
 	if err != nil {
 		t.Fatal(err)
@@ -289,11 +276,8 @@ func testCloseWithBlockingRead(t *testing.T, r, w *os.File) {
 		if err == nil {
 			t.Error("I/O on closed pipe unexpectedly succeeded")
 		}
-		if pe, ok := err.(*os.PathError); ok {
-			err = pe.Err
-		}
-		if err != io.EOF && err != os.ErrClosed {
-			t.Errorf("got %v, expected EOF or closed", err)
+		if err != io.EOF {
+			t.Errorf("got %v, expected io.EOF", err)
 		}
 	}(c2)
 

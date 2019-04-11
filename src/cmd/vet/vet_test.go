@@ -13,7 +13,6 @@ import (
 	"log"
 	"os"
 	"os/exec"
-	"path"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -22,25 +21,16 @@ import (
 	"testing"
 )
 
-const dataDir = "testdata"
-
-var binary string
+const (
+	dataDir = "testdata"
+	binary  = "./testvet.exe"
+)
 
 // We implement TestMain so remove the test binary when all is done.
 func TestMain(m *testing.M) {
-	os.Exit(testMain(m))
-}
-
-func testMain(m *testing.M) int {
-	dir, err := ioutil.TempDir("", "vet_test")
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		return 1
-	}
-	defer os.RemoveAll(dir)
-	binary = filepath.Join(dir, "testvet.exe")
-
-	return m.Run()
+	result := m.Run()
+	os.Remove(binary)
+	os.Exit(result)
 }
 
 var (
@@ -69,9 +59,14 @@ func Build(t *testing.T) {
 	built = true
 }
 
-func vetCmd(t *testing.T, arg, pkg string) *exec.Cmd {
-	cmd := exec.Command(testenv.GoToolPath(t), "vet", "-vettool="+binary, arg, path.Join("cmd/vet/testdata", pkg))
-	cmd.Env = os.Environ()
+func vetCmd(t *testing.T, args ...string) *exec.Cmd {
+	cmd := exec.Command(testenv.GoToolPath(t), "vet", "-vettool="+binary)
+	cmd.Args = append(cmd.Args, args...)
+	testdata, err := filepath.Abs("testdata")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cmd.Env = append(os.Environ(), "GOPATH="+testdata)
 	return cmd
 }
 
@@ -118,7 +113,7 @@ func TestVet(t *testing.T) {
 				cmd.Env = append(cmd.Env, "GOOS=linux", "GOARCH=amd64")
 			}
 
-			dir := filepath.Join("testdata", pkg)
+			dir := filepath.Join("testdata/src", pkg)
 			gos, err := filepath.Glob(filepath.Join(dir, "*.go"))
 			if err != nil {
 				t.Fatal(err)

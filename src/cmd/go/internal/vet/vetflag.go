@@ -76,8 +76,7 @@ func vetFlags(usage func(), args []string) (passToVet, packageNames []string) {
 	vetcmd.Stdout = out
 	if err := vetcmd.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "go vet: can't execute %s -flags: %v\n", tool, err)
-		base.SetExitStatus(2)
-		base.Exit()
+		os.Exit(2)
 	}
 	var analysisFlags []struct {
 		Name  string
@@ -86,8 +85,7 @@ func vetFlags(usage func(), args []string) (passToVet, packageNames []string) {
 	}
 	if err := json.Unmarshal(out.Bytes(), &analysisFlags); err != nil {
 		fmt.Fprintf(os.Stderr, "go vet: can't unmarshal JSON from %s -flags: %v", tool, err)
-		base.SetExitStatus(2)
-		base.Exit()
+		os.Exit(2)
 	}
 
 	// Add vet's flags to vetflagDefn.
@@ -136,8 +134,7 @@ func vetFlags(usage func(), args []string) (passToVet, packageNames []string) {
 		if f == nil {
 			fmt.Fprintf(os.Stderr, "vet: flag %q not defined\n", args[i])
 			fmt.Fprintf(os.Stderr, "Run \"go help vet\" for more information\n")
-			base.SetExitStatus(2)
-			base.Exit()
+			os.Exit(2)
 		}
 		if f.Value != nil {
 			if err := f.Value.Set(value); err != nil {
@@ -185,6 +182,5 @@ func usage() {
 	}
 	fmt.Fprintf(os.Stderr, "Run '%s -help' for the vet tool's flags.\n", cmd)
 
-	base.SetExitStatus(2)
-	base.Exit()
+	os.Exit(2)
 }

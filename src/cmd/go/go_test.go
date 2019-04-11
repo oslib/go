@@ -6,7 +6,6 @@ package main_test
 
 import (
 	"bytes"
-	"cmd/go/internal/cache"
 	"cmd/internal/sys"
 	"context"
 	"debug/elf"
@@ -147,18 +146,7 @@ func TestMain(m *testing.M) {
 		select {}
 	}
 
-	// Run with a temporary TMPDIR to check that the tests don't
-	// leave anything behind.
-	topTmpdir, err := ioutil.TempDir("", "cmd-go-test-")
-	if err != nil {
-		log.Fatal(err)
-	}
-	if !*testWork {
-		defer removeAll(topTmpdir)
-	}
-	os.Setenv(tempEnvName(), topTmpdir)
-
-	dir, err := ioutil.TempDir(topTmpdir, "tmpdir")
+	dir, err := ioutil.TempDir(os.Getenv("GOTMPDIR"), "cmd-go-test-")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -167,7 +155,6 @@ func TestMain(m *testing.M) {
 		defer removeAll(testTmpDir)
 	}
 
-	testGOCACHE = cache.DefaultDir()
 	if canRun {
 		testBin = filepath.Join(testTmpDir, "testbin")
 		if err := os.Mkdir(testBin, 0777); err != nil {
@@ -214,9 +201,7 @@ func TestMain(m *testing.M) {
 			return
 		}
 
-		buildCmd := exec.Command(gotool, args...)
-		buildCmd.Env = append(os.Environ(), "GOFLAGS=-mod=vendor")
-		out, err := buildCmd.CombinedOutput()
+		out, err := exec.Command(gotool, args...).CombinedOutput()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "building testgo failed: %v\n%s", err, out)
 			os.Exit(2)
@@ -271,23 +256,6 @@ func TestMain(m *testing.M) {
 	r := m.Run()
 	if !*testWork {
 		removeAll(testTmpDir) // os.Exit won't run defer
-	}
-
-	if !*testWork {
-		// There shouldn't be anything left in topTmpdir.
-		dirf, err := os.Open(topTmpdir)
-		if err != nil {
-			log.Fatal(err)
-		}
-		names, err := dirf.Readdirnames(0)
-		if err != nil {
-			log.Fatal(err)
-		}
-		if len(names) > 0 {
-			log.Fatalf("unexpected files left in tmpdir: %v", names)
-		}
-
-		removeAll(topTmpdir)
 	}
 
 	os.Exit(r)
@@ -426,7 +394,6 @@ func (tg *testgoData) setenv(name, val string) {
 func (tg *testgoData) unsetenv(name string) {
 	if tg.env == nil {
 		tg.env = append([]string(nil), os.Environ()...)
-		tg.env = append(tg.env, "GO111MODULE=off")
 	}
 	for i, v := range tg.env {
 		if strings.HasPrefix(v, name+"=") {
@@ -1888,7 +1855,7 @@ func TestGoListTest(t *testing.T) {
 	tg.grepStdout(`^runtime/cgo$`, "missing runtime/cgo")
 
 	tg.run("list", "-deps", "-f", "{{if .DepOnly}}{{.ImportPath}}{{end}}", "sort")
-	tg.grepStdout(`^internal/reflectlite$`, "missing internal/reflectlite")
+	tg.grepStdout(`^reflect$`, "missing reflect")
 	tg.grepStdoutNot(`^sort`, "unexpected sort")
 }
 
@@ -2612,14 +2579,6 @@ func TestCoverageDepLoop(t *testing.T) {
 	// Make sure that coverage on coverdep2/p2 recompiles coverdep2/p2.
 	tg.run("test", "-short", "-cover", "coverdep2/p1")
 	tg.grepStdout("coverage: 100.0% of statements", "expected 100.0% coverage")
-}
-
-func TestCoverageNoStatements(t *testing.T) {
-	tooSlow(t)
-	tg := testgo(t)
-	defer tg.cleanup()
-	tg.run("test", "-cover", "./testdata/testcover/pkg4")
-	tg.grepStdout("[no statements]", "expected [no statements] for pkg4")
 }
 
 func TestCoverageImportMainLoop(t *testing.T) {
@@ -3407,6 +3366,22 @@ func TestGoGetDotSlashDownload(t *testing.T) {
 	tg.run("get", "./pprof_mac_fix")
 }
 
+// Issue 13037: Was not parsing <meta> tags in 404 served over HTTPS
+func TestGoGetHTTPS404(t *testing.T) {
+	testenv.MustHaveExternalNetwork(t)
+	switch runtime.GOOS {
+	case "darwin", "linux", "freebsd":
+	default:
+		t.Skipf("test case does not work on %s", runtime.GOOS)
+	}
+
+	tg := testgo(t)
+	defer tg.cleanup()
+	tg.tempDir("src")
+	tg.setenv("GOPATH", tg.path("."))
+	tg.run("get", "bazil.org/fuse/fs/fstestutil")
+}
+
 // Test that you cannot import a main package.
 // See golang.org/issue/4210 and golang.org/issue/17475.
 func TestImportMain(t *testing.T) {
@@ -3664,7 +3639,6 @@ func TestGoGetInsecure(t *testing.T) {
 			tg.tempFile("go.mod", "module m")
 			tg.cd(tg.path("."))
 			tg.setenv("GO111MODULE", "on")
-			tg.setenv("GOPROXY", "")
 		} else {
 			tg.setenv("GOPATH", tg.path("."))
 			tg.setenv("GO111MODULE", "off")
@@ -4200,9 +4174,9 @@ func TestBinaryOnlyPackages(t *testing.T) {
 
 		package p1
 	`)
-	tg.wantStale("p1", "binary-only packages are no longer supported", "p1 is binary-only, and this message should always be printed")
+	tg.wantStale("p1", "missing or invalid binary-only package", "p1 is binary-only but has no binary, should be stale")
 	tg.runFail("install", "p1")
-	tg.grepStderr("binary-only packages are no longer supported", "did not report attempt to compile binary-only package")
+	tg.grepStderr("missing or invalid binary-only package", "did not report attempt to compile binary-only package")
 
 	tg.tempFile("src/p1/p1.go", `
 		package p1
@@ -4228,13 +4202,48 @@ func TestBinaryOnlyPackages(t *testing.T) {
 		import _ "fmt"
 		func G()
 	`)
-	tg.wantStale("p1", "binary-only package", "should NOT want to rebuild p1 (first)")
-	tg.runFail("install", "p2")
-	tg.grepStderr("p1: binary-only packages are no longer supported", "did not report error for binary-only p1")
+	tg.wantNotStale("p1", "binary-only package", "should NOT want to rebuild p1 (first)")
+	tg.run("install", "-x", "p1") // no-op, up to date
+	tg.grepBothNot(`[\\/]compile`, "should not have run compiler")
+	tg.run("install", "p2") // does not rebuild p1 (or else p2 will fail)
+	tg.wantNotStale("p2", "", "should NOT want to rebuild p2")
 
-	tg.run("list", "-deps", "-f", "{{.ImportPath}}: {{.BinaryOnly}}", "p2")
-	tg.grepStdout("p1: true", "p1 not listed as BinaryOnly")
-	tg.grepStdout("p2: false", "p2 listed as BinaryOnly")
+	// changes to the non-source-code do not matter,
+	// and only one file needs the special comment.
+	tg.tempFile("src/p1/missing2.go", `
+		package p1
+		func H()
+	`)
+	tg.wantNotStale("p1", "binary-only package", "should NOT want to rebuild p1 (second)")
+	tg.wantNotStale("p2", "", "should NOT want to rebuild p2")
+
+	tg.tempFile("src/p3/p3.go", `
+		package main
+		import (
+			"p1"
+			"p2"
+		)
+		func main() {
+			p1.F(false)
+			p2.F()
+		}
+	`)
+	tg.run("install", "p3")
+
+	tg.run("run", tg.path("src/p3/p3.go"))
+	tg.grepStdout("hello from p1", "did not see message from p1")
+
+	tg.tempFile("src/p4/p4.go", `package main`)
+	// The odd string split below avoids vet complaining about
+	// a // +build line appearing too late in this source file.
+	tg.tempFile("src/p4/p4not.go", `//go:binary-only-package
+
+		/`+`/ +build asdf
+
+		package main
+	`)
+	tg.run("list", "-f", "{{.BinaryOnly}}", "p4")
+	tg.grepStdout("false", "did not see BinaryOnly=false for p4")
 }
 
 // Issue 16050.
@@ -4931,14 +4940,14 @@ func TestTestRegexps(t *testing.T) {
     x_test.go:15: LOG: Y running N=10000
     x_test.go:15: LOG: Y running N=1000000
     x_test.go:15: LOG: Y running N=100000000
-    x_test.go:15: LOG: Y running N=1000000000
+    x_test.go:15: LOG: Y running N=2000000000
 --- BENCH: BenchmarkX/Y
     x_test.go:15: LOG: Y running N=1
     x_test.go:15: LOG: Y running N=100
     x_test.go:15: LOG: Y running N=10000
     x_test.go:15: LOG: Y running N=1000000
     x_test.go:15: LOG: Y running N=100000000
-    x_test.go:15: LOG: Y running N=1000000000
+    x_test.go:15: LOG: Y running N=2000000000
 --- BENCH: BenchmarkX
     x_test.go:13: LOG: X running N=1
 --- BENCH: BenchmarkXX
@@ -5049,8 +5058,7 @@ func TestExecBuildX(t *testing.T) {
 	obj := tg.path("main")
 	tg.run("build", "-x", "-o", obj, src)
 	sh := tg.path("test.sh")
-	cmds := tg.getStderr()
-	err := ioutil.WriteFile(sh, []byte("set -e\n"+cmds), 0666)
+	err := ioutil.WriteFile(sh, []byte("set -e\n"+tg.getStderr()), 0666)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -5081,12 +5089,6 @@ func TestExecBuildX(t *testing.T) {
 	if string(out) != "hello" {
 		t.Fatalf("got %q; want %q", out, "hello")
 	}
-
-	matches := regexp.MustCompile(`^WORK=(.*)\n`).FindStringSubmatch(cmds)
-	if len(matches) == 0 {
-		t.Fatal("no WORK directory")
-	}
-	tg.must(os.RemoveAll(matches[1]))
 }
 
 func TestParallelNumber(t *testing.T) {
@@ -5954,7 +5956,7 @@ func TestBadCgoDirectives(t *testing.T) {
 	if runtime.Compiler == "gc" {
 		tg.runFail("build", tg.path("src/x/_cgo_yy.go")) // ... but if forced, the comment is rejected
 		// Actually, today there is a separate issue that _ files named
-		// on the command line are ignored. Once that is fixed,
+		// on the command-line are ignored. Once that is fixed,
 		// we want to see the cgo_ldflag error.
 		tg.grepStderr("//go:cgo_ldflag only allowed in cgo-generated code|no Go files", "did not reject //go:cgo_ldflag directive")
 	}

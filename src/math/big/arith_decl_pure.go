@@ -23,21 +23,11 @@ func subVV(z, x, y []Word) (c Word) {
 }
 
 func addVW(z, x []Word, y Word) (c Word) {
-	// TODO: remove indirect function call when golang.org/issue/30548 is fixed
-	fn := addVW_g
-	if len(z) > 32 {
-		fn = addVWlarge
-	}
-	return fn(z, x, y)
+	return addVW_g(z, x, y)
 }
 
 func subVW(z, x []Word, y Word) (c Word) {
-	// TODO: remove indirect function call when golang.org/issue/30548 is fixed
-	fn := subVW_g
-	if len(z) > 32 {
-		fn = subVWlarge
-	}
-	return fn(z, x, y)
+	return subVW_g(z, x, y)
 }
 
 func shlVU(z, x []Word, s uint) (c Word) {

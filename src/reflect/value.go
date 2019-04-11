@@ -203,8 +203,7 @@ type nonEmptyInterface struct {
 // v.flag.mustBe(Bool), which will only bother to copy the
 // single important word for the receiver.
 func (f flag) mustBe(expected Kind) {
-	// TODO(mvdan): use f.kind() again once mid-stack inlining gets better
-	if Kind(f&flagKindMask) != expected {
+	if f.kind() != expected {
 		panic(&ValueError{methodName(), f.kind()})
 	}
 }
@@ -212,14 +211,8 @@ func (f flag) mustBe(expected Kind) {
 // mustBeExported panics if f records that the value was obtained using
 // an unexported field.
 func (f flag) mustBeExported() {
-	if f == 0 || f&flagRO != 0 {
-		f.mustBeExportedSlow()
-	}
-}
-
-func (f flag) mustBeExportedSlow() {
 	if f == 0 {
-		panic(&ValueError{methodName(), Invalid})
+		panic(&ValueError{methodName(), 0})
 	}
 	if f&flagRO != 0 {
 		panic("reflect: " + methodName() + " using value obtained using unexported field")
@@ -230,12 +223,6 @@ func (f flag) mustBeExportedSlow() {
 // which is to say that either it was obtained using an unexported field
 // or it is not addressable.
 func (f flag) mustBeAssignable() {
-	if f&flagRO != 0 || f&flagAddr == 0 {
-		f.mustBeAssignableSlow()
-	}
-}
-
-func (f flag) mustBeAssignableSlow() {
 	if f == 0 {
 		panic(&ValueError{methodName(), Invalid})
 	}
@@ -994,7 +981,7 @@ func (v Value) Interface() (i interface{}) {
 
 func valueInterface(v Value, safe bool) interface{} {
 	if v.flag == 0 {
-		panic(&ValueError{"reflect.Value.Interface", Invalid})
+		panic(&ValueError{"reflect.Value.Interface", 0})
 	}
 	if safe && v.flag&flagRO != 0 {
 		// Do not allow access to unexported values via Interface,

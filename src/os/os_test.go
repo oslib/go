@@ -1185,7 +1185,7 @@ func TestChdirAndGetwd(t *testing.T) {
 	// /usr/bin does not usually exist on Plan 9 or Android.
 	switch runtime.GOOS {
 	case "android":
-		dirs = []string{"/system/bin"}
+		dirs = []string{"/", "/system/bin"}
 	case "plan9":
 		dirs = []string{"/", "/usr"}
 	case "darwin":
@@ -1643,21 +1643,6 @@ func TestWriteAtNegativeOffset(t *testing.T) {
 	const wantsub = "negative offset"
 	if !strings.Contains(fmt.Sprint(err), wantsub) || n != 0 {
 		t.Errorf("WriteAt(-10) = %v, %v; want 0, ...%q...", n, err, wantsub)
-	}
-}
-
-// Verify that WriteAt doesn't work in append mode.
-func TestWriteAtInAppendMode(t *testing.T) {
-	defer chtmpdir(t)()
-	f, err := OpenFile("write_at_in_append_mode.txt", O_APPEND|O_CREATE, 0666)
-	if err != nil {
-		t.Fatalf("OpenFile: %v", err)
-	}
-	defer f.Close()
-
-	_, err = f.WriteAt([]byte(""), 1)
-	if err != ErrWriteAtInAppendMode {
-		t.Fatalf("f.WriteAt returned %v, expected %v", err, ErrWriteAtInAppendMode)
 	}
 }
 
@@ -2294,7 +2279,8 @@ func TestPipeThreads(t *testing.T) {
 	}
 }
 
-func testDoubleCloseError(t *testing.T, path string) {
+func TestDoubleCloseError(t *testing.T) {
+	path := sfdir + "/" + sfname
 	file, err := Open(path)
 	if err != nil {
 		t.Fatal(err)
@@ -2311,11 +2297,6 @@ func testDoubleCloseError(t *testing.T, path string) {
 	} else {
 		t.Logf("second close returned expected error %q", err)
 	}
-}
-
-func TestDoubleCloseError(t *testing.T) {
-	testDoubleCloseError(t, filepath.Join(sfdir, sfname))
-	testDoubleCloseError(t, sfdir)
 }
 
 func TestUserHomeDir(t *testing.T) {

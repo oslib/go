@@ -7,7 +7,6 @@ package template
 import (
 	"bytes"
 	"fmt"
-	"strings"
 	"unicode"
 	"unicode/utf8"
 )
@@ -157,7 +156,7 @@ func isCSSSpace(b byte) bool {
 // cssEscaper escapes HTML and CSS special characters using \<hex>+ escapes.
 func cssEscaper(args ...interface{}) string {
 	s, _ := stringify(args...)
-	var b strings.Builder
+	var b bytes.Buffer
 	r, w, written := rune(0), 0, 0
 	for i := 0; i < len(s); i += w {
 		// See comment in htmlEscaper.
@@ -168,9 +167,6 @@ func cssEscaper(args ...interface{}) string {
 			repl = cssReplacementTable[r]
 		default:
 			continue
-		}
-		if written == 0 {
-			b.Grow(len(s))
 		}
 		b.WriteString(s[written:i])
 		b.WriteString(repl)

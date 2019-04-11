@@ -174,9 +174,6 @@ type factsTable struct {
 	// more than one len(s) for a slice. We could keep a list if necessary.
 	lens map[ID]*Value
 	caps map[ID]*Value
-
-	// zero is a zero-valued constant
-	zero *Value
 }
 
 // checkpointFact is an invalid value used for checkpointing
@@ -194,7 +191,6 @@ func newFactsTable(f *Func) *factsTable {
 	ft.stack = make([]fact, 4)
 	ft.limits = make(map[ID]limit)
 	ft.limitStack = make([]limitFact, 4)
-	ft.zero = f.ConstInt64(f.Config.Types.Int64, 0)
 	return ft
 }
 
@@ -570,8 +566,7 @@ func (ft *factsTable) isNonNegative(v *Value) bool {
 		}
 	}
 
-	// Check if the signed poset can prove that the value is >= 0
-	return ft.order[0].OrderedOrEqual(ft.zero, v)
+	return false
 }
 
 // checkpoint saves the current state of known relations.
@@ -739,8 +734,14 @@ func prove(f *Func) {
 	ft.checkpoint()
 
 	// Find length and capacity ops.
+	var zero *Value
 	for _, b := range f.Blocks {
 		for _, v := range b.Values {
+			// If we found a zero constant, save it (so we don't have
+			// to build one later).
+			if zero == nil && v.Op == OpConst64 && v.AuxInt == 0 {
+				zero = v
+			}
 			if v.Uses == 0 {
 				// We don't care about dead values.
 				// (There can be some that are CSEd but not removed yet.)
@@ -748,19 +749,28 @@ func prove(f *Func) {
 			}
 			switch v.Op {
 			case OpStringLen:
-				ft.update(b, v, ft.zero, signed, gt|eq)
+				if zero == nil {
+					zero = b.NewValue0I(b.Pos, OpConst64, f.Config.Types.Int64, 0)
+				}
+				ft.update(b, v, zero, signed, gt|eq)
 			case OpSliceLen:
 				if ft.lens == nil {
 					ft.lens = map[ID]*Value{}
 				}
 				ft.lens[v.Args[0].ID] = v
-				ft.update(b, v, ft.zero, signed, gt|eq)
+				if zero == nil {
+					zero = b.NewValue0I(b.Pos, OpConst64, f.Config.Types.Int64, 0)
+				}
+				ft.update(b, v, zero, signed, gt|eq)
 			case OpSliceCap:
 				if ft.caps == nil {
 					ft.caps = map[ID]*Value{}
 				}
 				ft.caps[v.Args[0].ID] = v
-				ft.update(b, v, ft.zero, signed, gt|eq)
+				if zero == nil {
+					zero = b.NewValue0I(b.Pos, OpConst64, f.Config.Types.Int64, 0)
+				}
+				ft.update(b, v, zero, signed, gt|eq)
 			}
 		}
 	}
@@ -894,7 +904,7 @@ func getBranch(sdom SparseTree, p *Block, b *Block) branch {
 // starting in Block b.
 func addIndVarRestrictions(ft *factsTable, b *Block, iv indVar) {
 	d := signed
-	if ft.isNonNegative(iv.min) && ft.isNonNegative(iv.max) {
+	if isNonNegative(iv.min) && isNonNegative(iv.max) {
 		d |= unsigned
 	}
 
@@ -930,41 +940,31 @@ func addBranchRestrictions(ft *factsTable, b *Block, br branch) {
 		if d == signed && ft.isNonNegative(c.Args[0]) && ft.isNonNegative(c.Args[1]) {
 			d |= unsigned
 		}
-		switch b.Control.Op {
-		case OpIsInBounds, OpIsSliceInBounds:
-			// 0 <= a0 < a1 (or 0 <= a0 <= a1)
-			//
-			// On the positive branch, we learn:
-			//   signed: 0 <= a0 < a1 (or 0 <= a0 <= a1)
-			//   unsigned:    a0 < a1 (or a0 <= a1)
-			//
-			// On the negative branch, we learn (0 > a0 ||
-			// a0 >= a1). In the unsigned domain, this is
-			// simply a0 >= a1 (which is the reverse of the
-			// positive branch, so nothing surprising).
-			// But in the signed domain, we can't express the ||
-			// condition, so check if a0 is non-negative instead,
-			// to be able to learn something.
-			switch br {
-			case negative:
+		switch br {
+		case negative:
+			switch b.Control.Op { // Special cases
+			case OpIsInBounds, OpIsSliceInBounds:
+				// 0 <= a0 < a1 (or 0 <= a0 <= a1)
+				//
+				// On the positive branch, we learn a0 < a1,
+				// both signed and unsigned.
+				//
+				// On the negative branch, we learn (0 > a0 ||
+				// a0 >= a1). In the unsigned domain, this is
+				// simply a0 >= a1 (which is the reverse of the
+				// positive branch, so nothing surprising).
+				// But in the signed domain, we can't express the ||
+				// condition, so check if a0 is non-negative instead,
+				// to be able to learn something.
 				d = unsigned
 				if ft.isNonNegative(c.Args[0]) {
 					d |= signed
 				}
-				addRestrictions(b, ft, d, c.Args[0], c.Args[1], tr.r^(lt|gt|eq))
-			case positive:
-				addRestrictions(b, ft, signed, ft.zero, c.Args[0], lt|eq)
-				addRestrictions(b, ft, d, c.Args[0], c.Args[1], tr.r)
 			}
-		default:
-			switch br {
-			case negative:
-				addRestrictions(b, ft, d, c.Args[0], c.Args[1], tr.r^(lt|gt|eq))
-			case positive:
-				addRestrictions(b, ft, d, c.Args[0], c.Args[1], tr.r)
-			}
+			addRestrictions(b, ft, d, c.Args[0], c.Args[1], tr.r^(lt|gt|eq))
+		case positive:
+			addRestrictions(b, ft, d, c.Args[0], c.Args[1], tr.r)
 		}
-
 	}
 }
 

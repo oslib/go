@@ -131,8 +131,11 @@ func TestBasicOperations(t *testing.T) {
 		check(t, "TestBasicOperations (3)", &buf, "")
 
 		n, err := buf.Write(testBytes[0:1])
-		if want := 1; err != nil || n != want {
-			t.Errorf("Write: got (%d, %v), want (%d, %v)", n, err, want, nil)
+		if n != 1 {
+			t.Errorf("wrote 1 byte, but n == %d", n)
+		}
+		if err != nil {
+			t.Errorf("err should always be nil, but err == %s", err)
 		}
 		check(t, "TestBasicOperations (4)", &buf, "a")
 
@@ -140,8 +143,8 @@ func TestBasicOperations(t *testing.T) {
 		check(t, "TestBasicOperations (5)", &buf, "ab")
 
 		n, err = buf.Write(testBytes[2:26])
-		if want := 24; err != nil || n != want {
-			t.Errorf("Write: got (%d, %v), want (%d, %v)", n, err, want, nil)
+		if n != 24 {
+			t.Errorf("wrote 24 bytes, but n == %d", n)
 		}
 		check(t, "TestBasicOperations (6)", &buf, testString[0:26])
 
@@ -156,12 +159,15 @@ func TestBasicOperations(t *testing.T) {
 
 		buf.WriteByte(testString[1])
 		c, err := buf.ReadByte()
-		if want := testString[1]; err != nil || c != want {
-			t.Errorf("ReadByte: got (%q, %v), want (%q, %v)", c, err, want, nil)
+		if err != nil {
+			t.Error("ReadByte unexpected eof")
+		}
+		if c != testString[1] {
+			t.Errorf("ReadByte wrong value c=%v", c)
 		}
 		c, err = buf.ReadByte()
-		if err != io.EOF {
-			t.Errorf("ReadByte: got (%q, %v), want (%q, %v)", c, err, byte(0), io.EOF)
+		if err == nil {
+			t.Error("ReadByte unexpected not eof")
 		}
 	}
 }

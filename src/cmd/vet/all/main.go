@@ -42,7 +42,7 @@ var failed uint32 // updated atomically
 
 func main() {
 	log.SetPrefix("vet/all: ")
-	log.SetFlags(log.Lshortfile)
+	log.SetFlags(0)
 
 	var err error
 	cmdGoPath, err = testenv.GoTool()
@@ -77,10 +77,9 @@ var hostPlatform = platform{os: build.Default.GOOS, arch: build.Default.GOARCH}
 func allPlatforms() []platform {
 	var pp []platform
 	cmd := exec.Command(cmdGoPath, "tool", "dist", "list")
-	cmd.Stderr = new(strings.Builder)
 	out, err := cmd.Output()
 	if err != nil {
-		log.Fatalf("%s: %v\n%s", strings.Join(cmd.Args, " "), err, cmd.Stderr)
+		log.Fatal(err)
 	}
 	lines := bytes.Split(out, []byte{'\n'})
 	for _, line := range lines {
@@ -209,6 +208,12 @@ func (p platform) vet() {
 		return
 	}
 
+	if p.os == "aix" && p.arch == "ppc64" {
+		// TODO(aix): enable as soon as the aix/ppc64 port has fully landed
+		fmt.Println("skipping aix/ppc64")
+		return
+	}
+
 	var buf bytes.Buffer
 	fmt.Fprintf(&buf, "go run main.go -p %s\n", p)
 
@@ -216,58 +221,22 @@ func (p platform) vet() {
 	w := make(whitelist)
 	w.load(p.os, p.arch)
 
-	var vetCmd []string
+	tmpdir, err := ioutil.TempDir("", "cmd-vet-all")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer os.RemoveAll(tmpdir)
 
-	if os.Getenv("GO_BUILDER_NAME") == "" {
-		vetCmd = []string{cmdGoPath, "vet"}
-	} else {
-		// Build the go/packages-based vet command from the x/tools
-		// repo. It is considerably faster than "go vet", which rebuilds
-		// the standard library.
-		tmpdir, err := ioutil.TempDir("", "cmd-vet-all")
-		if err != nil {
-			log.Fatal(err)
-		}
-		defer os.RemoveAll(tmpdir)
-
-		vetTool := filepath.Join(tmpdir, "vet")
-		vetCmd = []string{
-			vetTool,
-			"-nilness=0", // expensive, uses SSA
-		}
-
-		cmd := exec.Command(cmdGoPath, "build", "-o", vetTool, "golang.org/x/tools/go/analysis/cmd/vet")
-		cmd.Env = append(os.Environ(),
-			// Setting GO111MODULE to on is redundant in master
-			// (Go 1.13), but not if we backport this to Go 1.11/1.12
-			// release branches (for our own builder usage) or if
-			// master ends up reverting its GO111MODULE default. If
-			// that happens, we want to force it on here anyway, as
-			// we're now depending on it.
-			"GO111MODULE=on",
-		)
-		// Use the module that cmd/vet/all is a part of:
-		cmd.Dir = filepath.Join(runtime.GOROOT(), "src", "cmd", "vet", "all")
-
-		// golang.org/x/tools does not have a vendor directory, so don't try to use
-		// one in module mode.
-		for i, v := range cmd.Env {
-			if strings.HasPrefix(v, "GOFLAGS=") {
-				var goflags []string
-				for _, f := range strings.Fields(strings.TrimPrefix(v, "GOFLAGS=")) {
-					if f != "-mod=vendor" && f != "--mod=vendor" {
-						goflags = append(goflags, f)
-					}
-				}
-				cmd.Env[i] = strings.Join(goflags, " ")
-			}
-		}
-
-		cmd.Stderr = os.Stderr
-		cmd.Stdout = os.Stderr
-		if err := cmd.Run(); err != nil {
-			log.Fatalf("%s: %v", strings.Join(cmd.Args, " "), err)
-		}
+	// Build the go/packages-based vet command from the x/tools
+	// repo. It is considerably faster than "go vet", which rebuilds
+	// the standard library.
+	vetTool := filepath.Join(tmpdir, "vet")
+	cmd := exec.Command(cmdGoPath, "build", "-o", vetTool, "golang.org/x/tools/go/analysis/cmd/vet")
+	cmd.Dir = filepath.Join(runtime.GOROOT(), "src")
+	cmd.Stderr = os.Stderr
+	cmd.Stdout = os.Stderr
+	if err := cmd.Run(); err != nil {
+		log.Fatal(err)
 	}
 
 	// TODO: The unsafeptr checks are disabled for now,
@@ -275,13 +244,13 @@ func (p platform) vet() {
 	// and no clear way to improve vet to eliminate large chunks of them.
 	// And having them in the whitelists will just cause annoyance
 	// and churn when working on the runtime.
-	cmd := exec.Command(vetCmd[0],
-		append(vetCmd[1:],
-			"-unsafeptr=0",
-			"std",
-			"cmd/...",
-			"cmd/compile/internal/gc/testdata",
-		)...)
+	cmd = exec.Command(vetTool,
+		"-unsafeptr=0",
+		"-nilness=0", // expensive, uses SSA
+		"std",
+		"cmd/...",
+		"cmd/compile/internal/gc/testdata",
+	)
 	cmd.Dir = filepath.Join(runtime.GOROOT(), "src")
 	cmd.Env = append(os.Environ(), "GOOS="+p.os, "GOARCH="+p.arch, "CGO_ENABLED=0")
 	stderr, err := cmd.StderrPipe()
@@ -351,7 +320,7 @@ NextLine:
 		if file == "" {
 			if !parseFailed {
 				parseFailed = true
-				fmt.Fprintf(os.Stderr, "failed to parse %s output:\n# %s\n", p, strings.Join(cmd.Args, " "))
+				fmt.Fprintf(os.Stderr, "failed to parse %s vet output:\n", p)
 			}
 			fmt.Fprintln(os.Stderr, line)
 			continue

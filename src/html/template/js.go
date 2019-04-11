@@ -187,7 +187,7 @@ func jsValEscaper(args ...interface{}) string {
 	}
 	first, _ := utf8.DecodeRune(b)
 	last, _ := utf8.DecodeLastRune(b)
-	var buf strings.Builder
+	var buf bytes.Buffer
 	// Prevent IdentifierNames and NumericLiterals from running into
 	// keywords: in, instanceof, typeof, void
 	pad := isJSIdentPart(first) || isJSIdentPart(last)
@@ -217,7 +217,7 @@ func jsValEscaper(args ...interface{}) string {
 		if pad {
 			buf.WriteByte(' ')
 		}
-		return buf.String()
+		b = buf.Bytes()
 	}
 	return string(b)
 }
@@ -253,7 +253,7 @@ func jsRegexpEscaper(args ...interface{}) string {
 // It also replaces runes U+2028 and U+2029 with the raw strings `\u2028` and
 // `\u2029`.
 func replace(s string, replacementTable []string) string {
-	var b strings.Builder
+	var b bytes.Buffer
 	r, w, written := rune(0), 0, 0
 	for i := 0; i < len(s); i += w {
 		// See comment in htmlEscaper.
@@ -268,9 +268,6 @@ func replace(s string, replacementTable []string) string {
 			repl = `\u2029`
 		default:
 			continue
-		}
-		if written == 0 {
-			b.Grow(len(s))
 		}
 		b.WriteString(s[written:i])
 		b.WriteString(repl)

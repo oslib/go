@@ -16,7 +16,7 @@ func nodrune(r rune) *Node {
 }
 
 func nodflt(f float64) *Node {
-	v := newMpflt()
+	v := new(Mpflt)
 	v.SetFloat64(f)
 	return nodlit(Val{v})
 }

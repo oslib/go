@@ -56,9 +56,13 @@ export PATH=$GOROOT/bin:$PATH
 export CGO_ENABLED=1
 export CC_FOR_TARGET=$GOROOT/misc/ios/clangwrap.sh
 
-# Run the build for the host bootstrap, so we can build detect.go.
+# Run the build for the host bootstrap, so we can build go_darwin_arm_exec.
 # Also lets us fail early before the (slow) ios-deploy if the build is broken.
 ./make.bash
+
+GOOS=$GOHOSTOS GOARCH=$GOHOSTARCH go build \
+	-o ../bin/go_darwin_${GOARCH}_exec \
+	../misc/ios/go_darwin_arm_exec.go
 
 if [ "$GOIOS_DEV_ID" = "" ]; then
 	echo "detecting iOS development identity"

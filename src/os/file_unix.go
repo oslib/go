@@ -52,7 +52,6 @@ type file struct {
 	dirinfo     *dirInfo // nil unless directory being read
 	nonblock    bool     // whether we set nonblocking mode
 	stdoutOrErr bool     // whether this is stdout or stderr
-	appendMode  bool     // whether file is opened for appending
 }
 
 // Fd returns the integer Unix file descriptor referencing the open file.
@@ -124,7 +123,15 @@ func newFile(fd uintptr, name string, kind newFileKind) *File {
 	if kind == kindOpenFile {
 		var st syscall.Stat_t
 		switch runtime.GOOS {
-		case "dragonfly", "freebsd", "netbsd", "openbsd":
+		case "freebsd":
+			// On FreeBSD before 10.4 it used to crash the
+			// system unpredictably while running all.bash.
+			// When we stop supporting FreeBSD 10 we can merge
+			// this into the dragonfly/netbsd/openbsd case.
+			// Issue 27619.
+			pollable = false
+
+		case "dragonfly", "netbsd", "openbsd":
 			// Don't try to use kqueue with regular files on *BSDs.
 			// On FreeBSD a regular file is always
 			// reported as ready for writing.
@@ -391,23 +398,4 @@ func (f *File) readdir(n int) (fi []FileInfo, err error) {
 		err = io.EOF
 	}
 	return fi, err
-}
-
-// Readlink returns the destination of the named symbolic link.
-// If there is an error, it will be of type *PathError.
-func Readlink(name string) (string, error) {
-	for len := 128; ; len *= 2 {
-		b := make([]byte, len)
-		n, e := fixCount(syscall.Readlink(name, b))
-		// buffer too small
-		if runtime.GOOS == "aix" && e == syscall.ERANGE {
-			continue
-		}
-		if e != nil {
-			return "", &PathError{"readlink", name, e}
-		}
-		if n < len {
-			return string(b[0:n]), nil
-		}
-	}
 }

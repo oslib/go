@@ -13,7 +13,8 @@ import (
 
 func ParseGLOCKFILE(file string, data []byte) (*modfile.File, error) {
 	mf := new(modfile.File)
-	for _, line := range strings.Split(string(data), "\n") {
+	for lineno, line := range strings.Split(string(data), "\n") {
+		lineno++
 		f := strings.Fields(line)
 		if len(f) >= 2 && f[0] != "cmd" {
 			mf.Require = append(mf.Require, &modfile.Require{Mod: module.Version{Path: f[0], Version: f[1]}})

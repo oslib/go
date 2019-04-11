@@ -193,14 +193,10 @@ pair (-type id, encoded-type) where encoded-type is the gob encoding of a wireTy
 description, constructed from these types:
 
 	type wireType struct {
-		ArrayT           *ArrayType
-		SliceT           *SliceType
-		StructT          *StructType
-		MapT             *MapType
-		GobEncoderT      *gobEncoderType
-		BinaryMarshalerT *gobEncoderType
-		TextMarshalerT   *gobEncoderType
-
+		ArrayT  *ArrayType
+		SliceT  *SliceType
+		StructT *StructType
+		MapT    *MapType
 	}
 	type arrayType struct {
 		CommonType
@@ -227,9 +223,6 @@ description, constructed from these types:
 		CommonType
 		Key  typeId
 		Elem typeId
-	}
-	type gobEncoderType struct {
-		CommonType
 	}
 
 If there are nested type ids, the types for all inner type ids must be defined

@@ -523,14 +523,8 @@ func walkpartialcall(n *Node, init *Nodes) *Node {
 		// Trigger panic for method on nil interface now.
 		// Otherwise it happens in the wrapper and is confusing.
 		n.Left = cheapexpr(n.Left, init)
-		n.Left = walkexpr(n.Left, nil)
 
-		tab := nod(OITAB, n.Left, nil)
-		tab = typecheck(tab, ctxExpr)
-
-		c := nod(OCHECKNIL, tab, nil)
-		c.SetTypecheck(1)
-		init.Append(c)
+		checknil(n.Left, init)
 	}
 
 	typ := partialCallType(n)

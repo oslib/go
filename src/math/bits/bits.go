@@ -8,6 +8,8 @@
 // functions for the predeclared unsigned integer types.
 package bits
 
+import _ "unsafe" // for go:linkname
+
 const uintSize = 32 << (^uint(0) >> 32 & 1) // 32 or 64
 
 // UintSize is the size of a uint in bits.
@@ -230,7 +232,8 @@ func Reverse32(x uint32) uint32 {
 	x = x>>1&(m0&m) | x&(m0&m)<<1
 	x = x>>2&(m1&m) | x&(m1&m)<<2
 	x = x>>4&(m2&m) | x&(m2&m)<<4
-	return ReverseBytes32(x)
+	x = x>>8&(m3&m) | x&(m3&m)<<8
+	return x>>16 | x<<16
 }
 
 // Reverse64 returns the value of x with its bits in reversed order.
@@ -239,7 +242,9 @@ func Reverse64(x uint64) uint64 {
 	x = x>>1&(m0&m) | x&(m0&m)<<1
 	x = x>>2&(m1&m) | x&(m1&m)<<2
 	x = x>>4&(m2&m) | x&(m2&m)<<4
-	return ReverseBytes64(x)
+	x = x>>8&(m3&m) | x&(m3&m)<<8
+	x = x>>16&(m4&m) | x&(m4&m)<<16
+	return x>>32 | x<<32
 }
 
 // --- ReverseBytes ---
@@ -522,3 +527,9 @@ func Div64(hi, lo, y uint64) (quo, rem uint64) {
 
 	return q1*two32 + q0, (un21*two32 + un0 - q0*y) >> s
 }
+
+//go:linkname overflowError runtime.overflowError
+var overflowError error
+
+//go:linkname divideError runtime.divideError
+var divideError error

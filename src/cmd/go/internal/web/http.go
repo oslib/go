@@ -25,6 +25,10 @@ import (
 	"cmd/internal/browser"
 )
 
+// httpClient is the default HTTP client, but a variable so it can be
+// changed by tests, without modifying http.DefaultClient.
+var httpClient = http.DefaultClient
+
 // impatientInsecureHTTPClient is used in -insecure mode,
 // when we're connecting to https servers that might not be there
 // or might be using self-signed certificates.
@@ -35,18 +39,6 @@ var impatientInsecureHTTPClient = &http.Client{
 		TLSClientConfig: &tls.Config{
 			InsecureSkipVerify: true,
 		},
-	},
-}
-
-// securityPreservingHTTPClient is like the default HTTP client, but rejects
-// redirects to plain-HTTP URLs if the original URL was secure.
-var securityPreservingHTTPClient = &http.Client{
-	CheckRedirect: func(req *http.Request, via []*http.Request) error {
-		if len(via) > 0 && via[0].URL.Scheme == "https" && req.URL.Scheme != "https" {
-			lastHop := via[len(via)-1].URL
-			return fmt.Errorf("redirected from secure URL %s to insecure URL %s", lastHop, req.URL)
-		}
-		return nil
 	},
 }
 
@@ -62,7 +54,7 @@ func (e *HTTPError) Error() string {
 
 // Get returns the data from an HTTP GET request for the given URL.
 func Get(url string) ([]byte, error) {
-	resp, err := securityPreservingHTTPClient.Get(url)
+	resp, err := httpClient.Get(url)
 	if err != nil {
 		return nil, err
 	}
@@ -95,7 +87,7 @@ func GetMaybeInsecure(importPath string, security SecurityMode) (urlStr string, 
 		if security == Insecure && scheme == "https" { // fail earlier
 			res, err = impatientInsecureHTTPClient.Get(urlStr)
 		} else {
-			res, err = securityPreservingHTTPClient.Get(urlStr)
+			res, err = httpClient.Get(urlStr)
 		}
 		return
 	}

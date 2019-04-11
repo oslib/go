@@ -166,12 +166,11 @@ func variter(vl []*Node, t *Node, el []*Node) []*Node {
 		return append(init, as2)
 	}
 
-	nel := len(el)
 	for _, v := range vl {
 		var e *Node
 		if doexpr {
 			if len(el) == 0 {
-				yyerror("assignment mismatch: %d variables but %d values", len(vl), nel)
+				yyerror("missing expression in var declaration")
 				break
 			}
 			e = el[0]
@@ -195,7 +194,7 @@ func variter(vl []*Node, t *Node, el []*Node) []*Node {
 	}
 
 	if len(el) != 0 {
-		yyerror("assignment mismatch: %d variables but %d values", len(vl), nel)
+		yyerror("extra expression in var declaration")
 	}
 	return init
 }

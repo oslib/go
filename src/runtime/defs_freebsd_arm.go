@@ -163,9 +163,8 @@ type timespec struct {
 	pad_cgo_0 [4]byte
 }
 
-//go:nosplit
-func (ts *timespec) setNsec(ns int64) {
-	ts.tv_sec = int64(timediv(ns, 1e9, &ts.tv_nsec))
+func (ts *timespec) set_sec(x int64) {
+	ts.tv_sec = x
 }
 
 type timeval struct {

@@ -5,7 +5,6 @@
 package net
 
 import (
-	"internal/poll"
 	"internal/syscall/unix"
 	"syscall"
 	"unsafe"
@@ -55,12 +54,6 @@ func interfaceTable(ifindex int) ([]Interface, error) {
 		return nil, err
 	}
 
-	sock, err := sysSocket(syscall.AF_INET, syscall.SOCK_DGRAM, 0)
-	if err != nil {
-		return nil, err
-	}
-	defer poll.CloseFunc(sock)
-
 	var ift []Interface
 	for len(tab) > 0 {
 		ifm := (*syscall.IfMsgHdr)(unsafe.Pointer(&tab[0]))
@@ -78,6 +71,10 @@ func interfaceTable(ifindex int) ([]Interface, error) {
 				// Retrieve MTU
 				ifr := &ifreq{}
 				copy(ifr.Name[:], ifi.Name)
+				sock, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_DGRAM, 0)
+				if err != nil {
+					return nil, err
+				}
 				err = unix.Ioctl(sock, syscall.SIOCGIFMTU, uintptr(unsafe.Pointer(ifr)))
 				if err != nil {
 					return nil, err

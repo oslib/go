@@ -85,6 +85,7 @@ func (c *Conn) makeClientHello() (*clientHelloMsg, ecdheParameters, error) {
 	possibleCipherSuites := config.cipherSuites()
 	hello.cipherSuites = make([]uint16, 0, len(possibleCipherSuites))
 
+NextCipherSuite:
 	for _, suiteId := range possibleCipherSuites {
 		for _, suite := range cipherSuites {
 			if suite.id != suiteId {
@@ -93,10 +94,10 @@ func (c *Conn) makeClientHello() (*clientHelloMsg, ecdheParameters, error) {
 			// Don't advertise TLS 1.2-only cipher suites unless
 			// we're attempting TLS 1.2.
 			if hello.vers < VersionTLS12 && suite.flags&suiteTLS12 != 0 {
-				break
+				continue
 			}
 			hello.cipherSuites = append(hello.cipherSuites, suiteId)
-			break
+			continue NextCipherSuite
 		}
 	}
 
@@ -572,7 +573,7 @@ func (hs *clientHandshakeState) doFullHandshake() error {
 			return fmt.Errorf("tls: client certificate private key of type %T does not implement crypto.Signer", chainToSend.PrivateKey)
 		}
 
-		signatureAlgorithm, sigType, hashFunc, err := pickSignatureAlgorithm(key.Public(), certReq.supportedSignatureAlgorithms, hs.hello.supportedSignatureAlgorithms, c.vers)
+		signatureAlgorithm, sigType, hashFunc, err := pickSignatureAlgorithm(key.Public(), certReq.supportedSignatureAlgorithms, supportedSignatureAlgorithmsTLS12, c.vers)
 		if err != nil {
 			c.sendAlert(alertInternalError)
 			return err
@@ -826,7 +827,11 @@ func (c *Conn) verifyServerCertificate(certificates [][]byte) error {
 			DNSName:       c.config.ServerName,
 			Intermediates: x509.NewCertPool(),
 		}
-		for _, cert := range certs[1:] {
+
+		for i, cert := range certs {
+			if i == 0 {
+				continue
+			}
 			opts.Intermediates.AddCert(cert)
 		}
 		var err error

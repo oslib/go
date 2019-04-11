@@ -1158,9 +1158,7 @@ func converterForType(typ string) driver.ValueConverter {
 		// TODO(coopernurse): add type-specific converter
 		return driver.Null{Converter: driver.DefaultParameterConverter}
 	case "datetime":
-		return driver.NotNull{Converter: driver.DefaultParameterConverter}
-	case "nulldatetime":
-		return driver.Null{Converter: driver.DefaultParameterConverter}
+		return driver.DefaultParameterConverter
 	case "any":
 		return anyTypeConverter{}
 	}

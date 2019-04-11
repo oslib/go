@@ -730,14 +730,6 @@ func arm64Negate(op Op) Op {
 		return OpARM64NotEqual
 	case OpARM64NotEqual:
 		return OpARM64Equal
-	case OpARM64LessThanF:
-		return OpARM64GreaterEqualF
-	case OpARM64GreaterThanF:
-		return OpARM64LessEqualF
-	case OpARM64LessEqualF:
-		return OpARM64GreaterThanF
-	case OpARM64GreaterEqualF:
-		return OpARM64LessThanF
 	default:
 		panic("unreachable")
 	}
@@ -770,14 +762,6 @@ func arm64Invert(op Op) Op {
 		return OpARM64LessEqualU
 	case OpARM64Equal, OpARM64NotEqual:
 		return op
-	case OpARM64LessThanF:
-		return OpARM64GreaterThanF
-	case OpARM64GreaterThanF:
-		return OpARM64LessThanF
-	case OpARM64LessEqualF:
-		return OpARM64GreaterEqualF
-	case OpARM64GreaterEqualF:
-		return OpARM64LessEqualF
 	default:
 		panic("unreachable")
 	}
@@ -1053,13 +1037,13 @@ func isInlinableMemmove(dst, src *Value, sz int64, c *Config) bool {
 	return false
 }
 
-// encodes the lsb and width for arm(64) bitfield ops into the expected auxInt format.
-func armBFAuxInt(lsb, width int64) int64 {
+// encodes the lsb and width for arm64 bitfield ops into the expected auxInt format.
+func arm64BFAuxInt(lsb, width int64) int64 {
 	if lsb < 0 || lsb > 63 {
-		panic("ARM(64) bit field lsb constant out of range")
+		panic("ARM64 bit field lsb constant out of range")
 	}
 	if width < 1 || width > 64 {
-		panic("ARM(64) bit field width constant out of range")
+		panic("ARM64 bit field width constant out of range")
 	}
 	return width | lsb<<8
 }
@@ -1129,20 +1113,16 @@ func needRaceCleanup(sym interface{}, v *Value) bool {
 		for _, v := range b.Values {
 			switch v.Op {
 			case OpStaticCall:
+				switch v.Aux.(fmt.Stringer).String() {
+				case "runtime.racefuncenter", "runtime.racefuncexit", "runtime.panicindex",
+					"runtime.panicslice", "runtime.panicdivide", "runtime.panicwrap":
 				// Check for racefuncenter will encounter racefuncexit and vice versa.
 				// Allow calls to panic*
-				s := v.Aux.(fmt.Stringer).String()
-				switch s {
-				case "runtime.racefuncenter", "runtime.racefuncexit",
-					"runtime.panicdivide", "runtime.panicwrap",
-					"runtime.panicshift":
-					continue
+				default:
+					// If we encountered any call, we need to keep racefunc*,
+					// for accurate stacktraces.
+					return false
 				}
-				// If we encountered any call, we need to keep racefunc*,
-				// for accurate stacktraces.
-				return false
-			case OpPanicBounds, OpPanicExtend:
-				// Note: these are panic generators that are ok (like the static calls above).
 			case OpClosureCall, OpInterCall:
 				// We must keep the race functions if there are any other call types.
 				return false

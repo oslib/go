@@ -164,7 +164,7 @@ func renumberfiles(ctxt *Link, files []*sym.Symbol, d *sym.Pcdata) {
 // onlycsymbol reports whether this is a symbol that is referenced by C code.
 func onlycsymbol(s *sym.Symbol) bool {
 	switch s.Name {
-	case "_cgo_topofstack", "__cgo_topofstack", "_cgo_panic", "crosscall2":
+	case "_cgo_topofstack", "_cgo_panic", "crosscall2":
 		return true
 	}
 	if strings.HasPrefix(s.Name, "_cgoexp_") {
@@ -182,7 +182,10 @@ func emitPcln(ctxt *Link, s *sym.Symbol) bool {
 	}
 	// We want to generate func table entries only for the "lowest level" symbols,
 	// not containers of subsymbols.
-	return !s.Attr.Container()
+	if s.Attr.Container() {
+		return true
+	}
+	return true
 }
 
 // pclntab initializes the pclntab symbol with

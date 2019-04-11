@@ -366,9 +366,6 @@ const (
 	ATMLH
 	ATMLL
 
-	// insert program mask
-	AIPM
-
 	// compare and swap
 	ACS
 	ACSG

@@ -1088,11 +1088,6 @@ func readelfsym(arch *sys.Arch, syms *sym.Symbols, elfobj *ElfObj, i int, elfsym
 				if elfsym.other == 2 {
 					s.Attr |= sym.AttrVisibilityHidden
 				}
-
-				// Allow weak symbols to be duplicated when already defined.
-				if s.Outer != nil {
-					s.Attr |= sym.AttrDuplicateOK
-				}
 			}
 
 		default:

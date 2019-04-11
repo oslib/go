@@ -131,7 +131,6 @@ func bootstrapBuildTools() {
 	xmkdirall(base)
 
 	// Copy source code into $GOROOT/pkg/bootstrap and rewrite import paths.
-	writefile("module bootstrap\n", pathf("%s/%s", base, "go.mod"), 0)
 	for _, dir := range bootstrapDirs {
 		src := pathf("%s/src/%s", goroot, dir)
 		dst := pathf("%s/%s", base, dir)
@@ -205,7 +204,7 @@ func bootstrapBuildTools() {
 		cmd = append(cmd, "-toolexec="+tool)
 	}
 	cmd = append(cmd, "bootstrap/cmd/...")
-	run(base, ShowOutput|CheckExit, cmd...)
+	run(workspace, ShowOutput|CheckExit, cmd...)
 
 	// Copy binaries into tool binary directory.
 	for _, name := range bootstrapDirs {
@@ -245,7 +244,6 @@ func isUnneededSSARewriteFile(srcFile string) (archCaps string, unneeded bool) {
 	}
 	archCaps = fileArch
 	fileArch = strings.ToLower(fileArch)
-	fileArch = strings.TrimSuffix(fileArch, "splitload")
 	if fileArch == strings.TrimSuffix(runtime.GOARCH, "le") {
 		return "", false
 	}

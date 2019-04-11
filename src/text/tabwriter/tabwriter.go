@@ -473,12 +473,8 @@ func (b *Writer) terminateCell(htab bool) int {
 	return len(*line)
 }
 
-func (b *Writer) handlePanic(err *error, op string) {
+func handlePanic(err *error, op string) {
 	if e := recover(); e != nil {
-		if op == "Flush" {
-			// If Flush ran into a panic, we still need to reset.
-			b.reset()
-		}
 		if nerr, ok := e.(osError); ok {
 			*err = nerr.err
 			return
@@ -495,17 +491,10 @@ func (b *Writer) Flush() error {
 	return b.flush()
 }
 
-// flush is the internal version of Flush, with a named return value which we
-// don't want to expose.
 func (b *Writer) flush() (err error) {
-	defer b.handlePanic(&err, "Flush")
-	return b.flushNoDefers()
-}
+	defer b.reset() // even in the presence of errors
+	defer handlePanic(&err, "Flush")
 
-// flushNoDefers is like flush, but without a deferred handlePanic call. This
-// can be called from other methods which already have their own deferred
-// handlePanic calls, such as Write, and avoid the extra defer work.
-func (b *Writer) flushNoDefers() (err error) {
 	// add current cell if not empty
 	if b.cell.size > 0 {
 		if b.endChar != 0 {
@@ -517,7 +506,6 @@ func (b *Writer) flushNoDefers() (err error) {
 
 	// format contents of buffer
 	b.format(0, 0, len(b.lines))
-	b.reset()
 	return nil
 }
 
@@ -528,7 +516,7 @@ var hbar = []byte("---\n")
 // while writing to the underlying output stream.
 //
 func (b *Writer) Write(buf []byte) (n int, err error) {
-	defer b.handlePanic(&err, "Write")
+	defer handlePanic(&err, "Write")
 
 	// split text into cells
 	n = 0
@@ -551,7 +539,7 @@ func (b *Writer) Write(buf []byte) (n int, err error) {
 						// the formatting of the following lines (the last cell per
 						// line is ignored by format()), thus we can flush the
 						// Writer contents.
-						if err = b.flushNoDefers(); err != nil {
+						if err = b.Flush(); err != nil {
 							return
 						}
 						if ch == '\f' && b.flags&Debug != 0 {

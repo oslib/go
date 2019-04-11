@@ -7,7 +7,7 @@ package net
 import (
 	"syscall"
 
-	"golang.org/x/net/lif"
+	"internal/x/net/lif"
 )
 
 // If the ifindex is zero, interfaceTable returns mappings of all

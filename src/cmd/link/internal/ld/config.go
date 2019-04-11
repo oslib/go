@@ -38,7 +38,7 @@ func (mode *BuildMode) Set(s string) error {
 		*mode = BuildModeExe
 	case "pie":
 		switch objabi.GOOS {
-		case "aix", "android", "linux":
+		case "android", "linux":
 		case "darwin", "freebsd":
 			switch objabi.GOARCH {
 			case "amd64":
@@ -51,7 +51,7 @@ func (mode *BuildMode) Set(s string) error {
 		*mode = BuildModePIE
 	case "c-archive":
 		switch objabi.GOOS {
-		case "aix", "darwin", "linux":
+		case "darwin", "linux":
 		case "freebsd":
 			switch objabi.GOARCH {
 			case "amd64":
@@ -247,7 +247,7 @@ func determineLinkMode(ctxt *Link) {
 			}
 			ctxt.LinkMode = LinkInternal
 		case "1":
-			if objabi.GOARCH == "ppc64" && objabi.GOOS != "aix" {
+			if objabi.GOARCH == "ppc64" {
 				Exitf("external linking requested via GO_EXTLINK_ENABLED but not supported for %s/ppc64", objabi.GOOS)
 			}
 			ctxt.LinkMode = LinkExternal
@@ -256,12 +256,12 @@ func determineLinkMode(ctxt *Link) {
 				ctxt.LinkMode = LinkExternal
 			} else if iscgo && externalobj {
 				ctxt.LinkMode = LinkExternal
-			} else if ctxt.BuildMode == BuildModePIE && sys.PIEDefaultsToExternalLink(objabi.GOOS, objabi.GOARCH) {
-				ctxt.LinkMode = LinkExternal
+			} else if ctxt.BuildMode == BuildModePIE {
+				ctxt.LinkMode = LinkExternal // https://golang.org/issue/18968
 			} else {
 				ctxt.LinkMode = LinkInternal
 			}
-			if objabi.GOARCH == "ppc64" && objabi.GOOS != "aix" && ctxt.LinkMode == LinkExternal {
+			if objabi.GOARCH == "ppc64" && ctxt.LinkMode == LinkExternal {
 				Exitf("external linking is not supported for %s/ppc64", objabi.GOOS)
 			}
 		}
@@ -270,7 +270,7 @@ func determineLinkMode(ctxt *Link) {
 			Exitf("internal linking requested but external linking required: %s", reason)
 		}
 	case LinkExternal:
-		if objabi.GOARCH == "ppc64" && objabi.GOOS != "aix" {
+		if objabi.GOARCH == "ppc64" {
 			Exitf("external linking not supported for %s/ppc64", objabi.GOOS)
 		}
 	}

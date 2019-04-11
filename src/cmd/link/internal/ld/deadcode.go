@@ -209,6 +209,11 @@ func (d *deadcodepass) markMethod(m methodref) {
 func (d *deadcodepass) init() {
 	var names []string
 
+	if d.ctxt.Arch.Family == sys.ARM {
+		// mark some functions that are only referenced after linker code editing
+		names = append(names, "runtime.read_tls_fallback")
+	}
+
 	if d.ctxt.BuildMode == BuildModeShared {
 		// Mark all symbols defined in this library as reachable when
 		// building a shared library.
@@ -222,7 +227,7 @@ func (d *deadcodepass) init() {
 		// functions and mark what is reachable from there.
 
 		if d.ctxt.linkShared && (d.ctxt.BuildMode == BuildModeExe || d.ctxt.BuildMode == BuildModePIE) {
-			names = append(names, "main.main", "main..inittask")
+			names = append(names, "main.main", "main.init")
 		} else {
 			// The external linker refers main symbol directly.
 			if d.ctxt.LinkMode == LinkExternal && (d.ctxt.BuildMode == BuildModeExe || d.ctxt.BuildMode == BuildModePIE) {
@@ -234,7 +239,7 @@ func (d *deadcodepass) init() {
 			}
 			names = append(names, *flagEntrySymbol)
 			if d.ctxt.BuildMode == BuildModePlugin {
-				names = append(names, objabi.PathToPrefix(*flagPluginPath)+"..inittask", objabi.PathToPrefix(*flagPluginPath)+".main", "go.plugin.tabs")
+				names = append(names, objabi.PathToPrefix(*flagPluginPath)+".init", objabi.PathToPrefix(*flagPluginPath)+".main", "go.plugin.tabs")
 
 				// We don't keep the go.plugin.exports symbol,
 				// but we do keep the symbols it refers to.

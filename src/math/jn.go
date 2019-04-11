@@ -103,15 +103,15 @@ func Jn(n int, x float64) float64 {
 			//                 3     s+c             c-s
 
 			var temp float64
-			switch s, c := Sincos(x); n & 3 {
+			switch n & 3 {
 			case 0:
-				temp = c + s
+				temp = Cos(x) + Sin(x)
 			case 1:
-				temp = -c + s
+				temp = -Cos(x) + Sin(x)
 			case 2:
-				temp = -c - s
+				temp = -Cos(x) - Sin(x)
 			case 3:
-				temp = c - s
+				temp = Cos(x) - Sin(x)
 			}
 			b = (1 / SqrtPi) * temp / Sqrt(x)
 		} else {
@@ -278,15 +278,15 @@ func Yn(n int, x float64) float64 {
 		//		   3	 s+c		 c-s
 
 		var temp float64
-		switch s, c := Sincos(x); n & 3 {
+		switch n & 3 {
 		case 0:
-			temp = s - c
+			temp = Sin(x) - Cos(x)
 		case 1:
-			temp = -s - c
+			temp = -Sin(x) - Cos(x)
 		case 2:
-			temp = -s + c
+			temp = -Sin(x) + Cos(x)
 		case 3:
-			temp = s + c
+			temp = Sin(x) + Cos(x)
 		}
 		b = (1 / SqrtPi) * temp / Sqrt(x)
 	} else {

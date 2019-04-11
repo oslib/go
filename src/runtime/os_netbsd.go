@@ -148,7 +148,9 @@ func semasleep(ns int64) int32 {
 			if wait <= 0 {
 				return -1
 			}
-			ts.setNsec(wait)
+			var nsec int32
+			ts.set_sec(timediv(wait, 1000000000, &nsec))
+			ts.set_nsec(nsec)
 			tsp = &ts
 		}
 		ret := lwp_park(_CLOCK_MONOTONIC, _TIMER_RELTIME, tsp, 0, unsafe.Pointer(&_g_.m.waitsemacount), nil)
@@ -328,7 +330,6 @@ func sigdelset(mask *sigset, i int) {
 	mask.__bits[(i-1)/32] &^= 1 << ((uint32(i) - 1) & 31)
 }
 
-//go:nosplit
 func (c *sigctxt) fixsigcode(sig uint32) {
 }
 

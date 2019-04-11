@@ -489,7 +489,7 @@ General-purpose environment variables:
 	GOFLAGS
 		A space-separated list of -flag=value settings to apply
 		to go commands by default, when the given flag is known by
-		the current command. Flags listed on the command line
+		the current command. Flags listed on the command-line
 		are applied after this list and therefore override it.
 	GOOS
 		The operating system for which to compile code.
@@ -563,9 +563,6 @@ Architecture-specific environment variables:
 	GOMIPS64
 		For GOARCH=mips64{,le}, whether to use floating point instructions.
 		Valid values are hardfloat (default), softfloat.
-	GOWASM
-		For GOARCH=wasm, comma-separated list of experimental WebAssembly features to use.
-		Valid values are satconv, signext.
 
 Special-purpose environment variables:
 
@@ -590,8 +587,6 @@ Additional information available from 'go env' but not read from the environment
 
 	GOEXE
 		The executable file name suffix (".exe" on Windows, "" on other systems).
-	GOGCCFLAGS
-		A space-separated list of arguments supplied to the CC command.
 	GOHOSTARCH
 		The architecture (GOARCH) of the Go toolchain binaries.
 	GOHOSTOS
@@ -640,6 +635,15 @@ constraints, but the go command stops scanning for build constraints
 at the first item in the file that is not a blank line or //-style
 line comment. See the go/build package documentation for
 more details.
+
+Through the Go 1.12 release, non-test Go source files can also include
+a //go:binary-only-package comment, indicating that the package
+sources are included for documentation only and must not be used to
+build the package binary. This enables distribution of Go packages in
+their compiled form alone. Even binary-only packages require accurate
+import blocks listing required dependencies, so that those
+dependencies can be supplied when linking the resulting command.
+Note that this feature is scheduled to be removed after the Go 1.12 release.
 	`,
 }
 
@@ -689,9 +693,6 @@ are:
 	-buildmode=plugin
 		Build the listed main packages, plus all packages that they
 		import, into a Go plugin. Packages not named main are ignored.
-
-On AIX, when linking a C program that uses a Go archive built with
--buildmode=c-archive, you must pass -Wl,-bnoobjreorder to the C compiler.
 `,
 }
 

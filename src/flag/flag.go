@@ -341,15 +341,17 @@ type Flag struct {
 
 // sortFlags returns the flags as a slice in lexicographical sorted order.
 func sortFlags(flags map[string]*Flag) []*Flag {
-	result := make([]*Flag, len(flags))
+	list := make(sort.StringSlice, len(flags))
 	i := 0
 	for _, f := range flags {
-		result[i] = f
+		list[i] = f.Name
 		i++
 	}
-	sort.Slice(result, func(i, j int) bool {
-		return result[i].Name < result[j].Name
-	})
+	list.Sort()
+	result := make([]*Flag, len(list))
+	for i, name := range list {
+		result[i] = flags[name]
+	}
 	return result
 }
 

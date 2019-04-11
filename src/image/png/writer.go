@@ -288,6 +288,7 @@ func filter(cr *[nFilter][]byte, pr []byte, bpp int) int {
 		}
 	}
 	if sum < best {
+		best = sum
 		filter = ftAverage
 	}
 

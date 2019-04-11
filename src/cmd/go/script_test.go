@@ -83,13 +83,7 @@ type backgroundCmd struct {
 }
 
 var extraEnvKeys = []string{
-	"SYSTEMROOT",         // must be preserved on Windows to find DLLs; golang.org/issue/25210
-	"WINDIR",             // must be preserved on Windows to be able to run PowerShell command; golang.org/issue/30711
-	"LD_LIBRARY_PATH",    // must be preserved on Unix systems to find shared libraries
-	"CC",                 // don't lose user settings when invoking cgo
-	"GO_TESTING_GOTOOLS", // for gccgo testing
-	"GCCGO",              // for gccgo testing
-	"GCCGOTOOLDIR",       // for gccgo testing
+	"SYSTEMROOT", // must be preserved on Windows to find DLLs; golang.org/issue/25210
 }
 
 // setup sets up the test execution temporary directory and environment.
@@ -110,7 +104,6 @@ func (ts *testScript) setup() {
 		"GOPATH=" + filepath.Join(ts.workdir, "gopath"),
 		"GOPROXY=" + proxyURL,
 		"GOROOT=" + testGOROOT,
-		"GONOVERIFY=*",
 		tempEnvName() + "=" + filepath.Join(ts.workdir, "tmp"),
 		"devnull=" + os.DevNull,
 		"goversion=" + goVersion(ts),
@@ -194,7 +187,7 @@ func (ts *testScript) run() {
 	a, err := txtar.ParseFile(ts.file)
 	ts.check(err)
 	for _, f := range a.Files {
-		name := ts.mkabs(ts.expand(f.Name, false))
+		name := ts.mkabs(ts.expand(f.Name))
 		ts.check(os.MkdirAll(filepath.Dir(name), 0777))
 		ts.check(ioutil.WriteFile(name, f.Data, 0666))
 	}
@@ -240,24 +233,34 @@ Script:
 		}
 
 		// Parse input line. Ignore blanks entirely.
-		parsed := ts.parse(line)
-		if parsed.name == "" {
-			if parsed.neg || len(parsed.conds) > 0 {
-				ts.fatalf("missing command")
-			}
+		args := ts.parse(line)
+		if len(args) == 0 {
 			continue
 		}
 
 		// Echo command to log.
 		fmt.Fprintf(&ts.log, "> %s\n", line)
 
-		for _, cond := range parsed.conds {
+		// Command prefix [cond] means only run this command if cond is satisfied.
+		for strings.HasPrefix(args[0], "[") && strings.HasSuffix(args[0], "]") {
+			cond := args[0]
+			cond = cond[1 : len(cond)-1]
+			cond = strings.TrimSpace(cond)
+			args = args[1:]
+			if len(args) == 0 {
+				ts.fatalf("missing command after condition")
+			}
+			want := true
+			if strings.HasPrefix(cond, "!") {
+				want = false
+				cond = strings.TrimSpace(cond[1:])
+			}
 			// Known conds are: $GOOS, $GOARCH, runtime.Compiler, and 'short' (for testing.Short).
 			//
 			// NOTE: If you make changes here, update testdata/script/README too!
 			//
 			ok := false
-			switch cond.tag {
+			switch cond {
 			case runtime.GOOS, runtime.GOARCH, runtime.Compiler:
 				ok = true
 			case "short":
@@ -277,8 +280,8 @@ Script:
 			case "symlink":
 				ok = testenv.HasSymlink()
 			default:
-				if strings.HasPrefix(cond.tag, "exec:") {
-					prog := cond.tag[len("exec:"):]
+				if strings.HasPrefix(cond, "exec:") {
+					prog := cond[len("exec:"):]
 					ok = execCache.Do(prog, func() interface{} {
 						if runtime.GOOS == "plan9" && prog == "git" {
 							// The Git command is usually not the real Git on Plan 9.
@@ -290,22 +293,33 @@ Script:
 					}).(bool)
 					break
 				}
-				if !imports.KnownArch[cond.tag] && !imports.KnownOS[cond.tag] && cond.tag != "gc" && cond.tag != "gccgo" {
-					ts.fatalf("unknown condition %q", cond.tag)
+				if !imports.KnownArch[cond] && !imports.KnownOS[cond] && cond != "gc" && cond != "gccgo" {
+					ts.fatalf("unknown condition %q", cond)
 				}
 			}
-			if ok != cond.want {
+			if ok != want {
 				// Don't run rest of line.
 				continue Script
 			}
 		}
 
-		// Run command.
-		cmd := scriptCmds[parsed.name]
-		if cmd == nil {
-			ts.fatalf("unknown command %q", parsed.name)
+		// Command prefix ! means negate the expectations about this command:
+		// go command should fail, match should not be found, etc.
+		neg := false
+		if args[0] == "!" {
+			neg = true
+			args = args[1:]
+			if len(args) == 0 {
+				ts.fatalf("! on line by itself")
+			}
 		}
-		cmd(ts, parsed.neg, parsed.args)
+
+		// Run command.
+		cmd := scriptCmds[args[0]]
+		if cmd == nil {
+			ts.fatalf("unknown command %q", args[0])
+		}
+		cmd(ts, neg, args[1:])
 
 		// Command can ask script to stop early.
 		if ts.stopped {
@@ -357,14 +371,6 @@ var scriptCmds = map[string]func(*testScript, bool, []string){
 	"wait":    (*testScript).cmdWait,
 }
 
-// When expanding shell variables for these commands, we apply regexp quoting to
-// expanded strings within the first argument.
-var regexpCmd = map[string]bool{
-	"grep":   true,
-	"stderr": true,
-	"stdout": true,
-}
-
 // addcrlf adds CRLF line endings to the named files.
 func (ts *testScript) cmdAddcrlf(neg bool, args []string) {
 	if len(args) == 0 {
@@ -388,7 +394,6 @@ func (ts *testScript) cmdCc(neg bool, args []string) {
 	var b work.Builder
 	b.Init()
 	ts.cmdExec(neg, append(b.GccCmd(".", ""), args...))
-	os.RemoveAll(b.WorkDir)
 }
 
 // cd changes to a different directory.
@@ -475,8 +480,8 @@ func (ts *testScript) doCmdCmp(args []string, env bool) {
 	text2 = string(data)
 
 	if env {
-		text1 = ts.expand(text1, false)
-		text2 = ts.expand(text2, false)
+		text1 = ts.expand(text1)
+		text2 = ts.expand(text2)
 	}
 
 	if text1 == text2 {
@@ -504,33 +509,16 @@ func (ts *testScript) cmdCp(neg bool, args []string) {
 	}
 
 	for _, arg := range args[:len(args)-1] {
-		var (
-			src  string
-			data []byte
-			mode os.FileMode
-		)
-		switch arg {
-		case "stdout":
-			src = arg
-			data = []byte(ts.stdout)
-			mode = 0666
-		case "stderr":
-			src = arg
-			data = []byte(ts.stderr)
-			mode = 0666
-		default:
-			src = ts.mkabs(arg)
-			info, err := os.Stat(src)
-			ts.check(err)
-			mode = info.Mode() & 0777
-			data, err = ioutil.ReadFile(src)
-			ts.check(err)
-		}
+		src := ts.mkabs(arg)
+		info, err := os.Stat(src)
+		ts.check(err)
+		data, err := ioutil.ReadFile(src)
+		ts.check(err)
 		targ := dst
 		if dstDir {
 			targ = filepath.Join(dst, filepath.Base(src))
 		}
-		ts.check(ioutil.WriteFile(targ, data, mode))
+		ts.check(ioutil.WriteFile(targ, data, info.Mode()&0777))
 	}
 }
 
@@ -754,11 +742,9 @@ func scriptMatch(ts *testScript, neg bool, args []string, text, name string) {
 		ts.fatalf("usage: %s [-count=N] 'pattern'%s", name, extraUsage)
 	}
 
-	pattern := `(?m)` + args[0]
-	re, err := regexp.Compile(pattern)
-	if err != nil {
-		ts.fatalf("regexp.Compile(%q): %v", pattern, err)
-	}
+	pattern := args[0]
+	re, err := regexp.Compile(`(?m)` + pattern)
+	ts.check(err)
 
 	isGrep := name == "grep"
 	if isGrep {
@@ -947,20 +933,8 @@ func interruptProcess(p *os.Process) {
 }
 
 // expand applies environment variable expansion to the string s.
-func (ts *testScript) expand(s string, inRegexp bool) string {
-	return os.Expand(s, func(key string) string {
-		e := ts.envMap[key]
-		if inRegexp {
-			// Replace workdir with $WORK, since we have done the same substitution in
-			// the text we're about to compare against.
-			e = strings.ReplaceAll(e, ts.workdir, "$WORK")
-
-			// Quote to literal strings: we want paths like C:\work\go1.4 to remain
-			// paths rather than regular expressions.
-			e = regexp.QuoteMeta(e)
-		}
-		return e
-	})
+func (ts *testScript) expand(s string) string {
+	return os.Expand(s, func(key string) string { return ts.envMap[key] })
 }
 
 // fatalf aborts the test with the given failure message.
@@ -978,82 +952,27 @@ func (ts *testScript) mkabs(file string) string {
 	return filepath.Join(ts.cd, file)
 }
 
-// A condition guards execution of a command.
-type condition struct {
-	want bool
-	tag  string
-}
-
-// A command is a complete command parsed from a script.
-type command struct {
-	neg   bool        // if true, expect the command to fail
-	conds []condition // all must be satisfied
-	name  string      // the name of the command; must be non-empty
-	args  []string    // shell-expanded arguments following name
-}
-
 // parse parses a single line as a list of space-separated arguments
 // subject to environment variable expansion (but not resplitting).
 // Single quotes around text disable splitting and expansion.
 // To embed a single quote, double it: 'Don''t communicate by sharing memory.'
-func (ts *testScript) parse(line string) command {
+func (ts *testScript) parse(line string) []string {
 	ts.line = line
 
 	var (
-		cmd      command
-		arg      string  // text of current arg so far (need to add line[start:i])
-		start    = -1    // if >= 0, position where current arg text chunk starts
-		quoted   = false // currently processing quoted text
-		isRegexp = false // currently processing unquoted regular expression
+		args   []string
+		arg    string  // text of current arg so far (need to add line[start:i])
+		start  = -1    // if >= 0, position where current arg text chunk starts
+		quoted = false // currently processing quoted text
 	)
-
-	flushArg := func() {
-		defer func() {
-			arg = ""
-			start = -1
-		}()
-
-		if cmd.name != "" {
-			cmd.args = append(cmd.args, arg)
-			isRegexp = false // Commands take only one regexp argument, so no subsequent args are regexps.
-			return
-		}
-
-		// Command prefix ! means negate the expectations about this command:
-		// go command should fail, match should not be found, etc.
-		if arg == "!" {
-			if cmd.neg {
-				ts.fatalf("duplicated '!' token")
-			}
-			cmd.neg = true
-			return
-		}
-
-		// Command prefix [cond] means only run this command if cond is satisfied.
-		if strings.HasPrefix(arg, "[") && strings.HasSuffix(arg, "]") {
-			want := true
-			arg = strings.TrimSpace(arg[1 : len(arg)-1])
-			if strings.HasPrefix(arg, "!") {
-				want = false
-				arg = strings.TrimSpace(arg[1:])
-			}
-			if arg == "" {
-				ts.fatalf("empty condition")
-			}
-			cmd.conds = append(cmd.conds, condition{want: want, tag: arg})
-			return
-		}
-
-		cmd.name = arg
-		isRegexp = regexpCmd[cmd.name]
-	}
-
 	for i := 0; ; i++ {
 		if !quoted && (i >= len(line) || line[i] == ' ' || line[i] == '\t' || line[i] == '\r' || line[i] == '#') {
 			// Found arg-separating space.
 			if start >= 0 {
-				arg += ts.expand(line[start:i], isRegexp)
-				flushArg()
+				arg += ts.expand(line[start:i])
+				args = append(args, arg)
+				start = -1
+				arg = ""
 			}
 			if i >= len(line) || line[i] == '#' {
 				break
@@ -1067,7 +986,7 @@ func (ts *testScript) parse(line string) command {
 			if !quoted {
 				// starting a quoted chunk
 				if start >= 0 {
-					arg += ts.expand(line[start:i], isRegexp)
+					arg += ts.expand(line[start:i])
 				}
 				start = i + 1
 				quoted = true
@@ -1091,7 +1010,7 @@ func (ts *testScript) parse(line string) command {
 			start = i
 		}
 	}
-	return cmd
+	return args
 }
 
 // diff returns a formatted diff of the two texts,

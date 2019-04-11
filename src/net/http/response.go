@@ -12,13 +12,12 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"internal/x/net/http/httpguts"
 	"io"
 	"net/textproto"
 	"net/url"
 	"strconv"
 	"strings"
-
-	"golang.org/x/net/http/httpguts"
 )
 
 var respExcludeHeader = map[string]bool{
@@ -67,7 +66,7 @@ type Response struct {
 	// with a "chunked" Transfer-Encoding.
 	//
 	// As of Go 1.12, the Body will be also implement io.Writer
-	// on a successful "101 Switching Protocols" response,
+	// on a successful "101 Switching Protocols" responses,
 	// as used by WebSockets and HTTP/2's "h2c" mode.
 	Body io.ReadCloser
 

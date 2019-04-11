@@ -20,7 +20,7 @@ import (
 	"testing"
 	"time"
 
-	"golang.org/x/net/dns/dnsmessage"
+	"internal/x/net/dns/dnsmessage"
 )
 
 var goResolver = Resolver{PreferGo: true}

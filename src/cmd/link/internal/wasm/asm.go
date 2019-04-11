@@ -417,71 +417,14 @@ func writeDataSec(ctxt *ld.Link) {
 		ctxt.Syms.Lookup("runtime.data", 0).Sect,
 	}
 
-	type dataSegment struct {
-		offset int32
-		data   []byte
-	}
+	writeUleb128(ctxt.Out, uint64(len(sections))) // number of data entries
 
-	// Omit blocks of zeroes and instead emit data segments with offsets skipping the zeroes.
-	// This reduces the size of the WebAssembly binary. We use 8 bytes as an estimate for the
-	// overhead of adding a new segment (same as wasm-opt's memory-packing optimization uses).
-	const segmentOverhead = 8
-
-	// Generate at most this many segments. A higher number of segments gets rejected by some WebAssembly runtimes.
-	const maxNumSegments = 100000
-
-	var segments []*dataSegment
-	for secIndex, sec := range sections {
-		data := ld.DatblkBytes(ctxt, int64(sec.Vaddr), int64(sec.Length))
-		offset := int32(sec.Vaddr)
-
-		// skip leading zeroes
-		for len(data) > 0 && data[0] == 0 {
-			data = data[1:]
-			offset++
-		}
-
-		for len(data) > 0 {
-			dataLen := int32(len(data))
-			var segmentEnd, zeroEnd int32
-			if len(segments)+(len(sections)-secIndex) == maxNumSegments {
-				segmentEnd = dataLen
-				zeroEnd = dataLen
-			} else {
-				for {
-					// look for beginning of zeroes
-					for segmentEnd < dataLen && data[segmentEnd] != 0 {
-						segmentEnd++
-					}
-					// look for end of zeroes
-					zeroEnd = segmentEnd
-					for zeroEnd < dataLen && data[zeroEnd] == 0 {
-						zeroEnd++
-					}
-					// emit segment if omitting zeroes reduces the output size
-					if zeroEnd-segmentEnd >= segmentOverhead || zeroEnd == dataLen {
-						break
-					}
-					segmentEnd = zeroEnd
-				}
-			}
-
-			segments = append(segments, &dataSegment{
-				offset: offset,
-				data:   data[:segmentEnd],
-			})
-			data = data[zeroEnd:]
-			offset += zeroEnd
-		}
-	}
-
-	writeUleb128(ctxt.Out, uint64(len(segments))) // number of data entries
-	for _, seg := range segments {
+	for _, sec := range sections {
 		writeUleb128(ctxt.Out, 0) // memidx
-		writeI32Const(ctxt.Out, seg.offset)
+		writeI32Const(ctxt.Out, int32(sec.Vaddr))
 		ctxt.Out.WriteByte(0x0b) // end
-		writeUleb128(ctxt.Out, uint64(len(seg.data)))
-		ctxt.Out.Write(seg.data)
+		writeUleb128(ctxt.Out, uint64(sec.Length))
+		ld.Datblk(ctxt, int64(sec.Vaddr), int64(sec.Length))
 	}
 
 	writeSecSize(ctxt, sizeOffset)

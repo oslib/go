@@ -28,9 +28,6 @@ func TestLargeText(t *testing.T) {
 	var w bytes.Buffer
 	const FN = 4
 	tmpdir, err := ioutil.TempDir("", "bigtext")
-	if err != nil {
-		t.Fatalf("can't create temp directory: %v\n", err)
-	}
 
 	defer os.RemoveAll(tmpdir)
 

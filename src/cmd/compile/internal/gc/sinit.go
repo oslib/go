@@ -26,33 +26,28 @@ type InitPlan struct {
 	E []InitEntry
 }
 
-type InitSchedule struct {
-	out       []*Node
+var (
 	initlist  []*Node
 	initplans map[*Node]*InitPlan
-	inittemps map[*Node]*Node
-}
-
-func (s *InitSchedule) append(n *Node) {
-	s.out = append(s.out, n)
-}
+	inittemps = make(map[*Node]*Node)
+)
 
 // init1 walks the AST starting at n, and accumulates in out
 // the list of definitions needing init code in dependency order.
-func (s *InitSchedule) init1(n *Node) {
+func init1(n *Node, out *[]*Node) {
 	if n == nil {
 		return
 	}
-	s.init1(n.Left)
-	s.init1(n.Right)
+	init1(n.Left, out)
+	init1(n.Right, out)
 	for _, n1 := range n.List.Slice() {
-		s.init1(n1)
+		init1(n1, out)
 	}
 
 	if n.isMethodExpression() {
 		// Methods called as Type.Method(receiver, ...).
 		// Definitions for method expressions are stored in type->nname.
-		s.init1(asNode(n.Type.FuncType().Nname))
+		init1(asNode(n.Type.FuncType().Nname), out)
 	}
 
 	if n.Op != ONAME {
@@ -83,16 +78,16 @@ func (s *InitSchedule) init1(n *Node) {
 		// a variable in the program, the tree walk will reach a cycle
 		// involving that variable.
 		if n.Class() != PFUNC {
-			s.foundinitloop(n, n)
+			foundinitloop(n, n)
 		}
 
-		for i := len(s.initlist) - 1; i >= 0; i-- {
-			x := s.initlist[i]
+		for i := len(initlist) - 1; i >= 0; i-- {
+			x := initlist[i]
 			if x == n {
 				break
 			}
 			if x.Class() != PFUNC {
-				s.foundinitloop(n, x)
+				foundinitloop(n, x)
 			}
 		}
 
@@ -102,7 +97,7 @@ func (s *InitSchedule) init1(n *Node) {
 
 	// reached a new unvisited node.
 	n.SetInitorder(InitPending)
-	s.initlist = append(s.initlist, n)
+	initlist = append(initlist, n)
 
 	// make sure that everything n depends on is initialized.
 	// n->defn is an assignment to n
@@ -113,7 +108,7 @@ func (s *InitSchedule) init1(n *Node) {
 			Fatalf("init1: bad defn")
 
 		case ODCLFUNC:
-			s.init2list(defn.Nbody)
+			init2list(defn.Nbody, out)
 
 		case OAS:
 			if defn.Left != n {
@@ -127,15 +122,15 @@ func (s *InitSchedule) init1(n *Node) {
 				break
 			}
 
-			s.init2(defn.Right)
+			init2(defn.Right, out)
 			if Debug['j'] != 0 {
 				fmt.Printf("%v\n", n.Sym)
 			}
-			if n.isBlank() || !s.staticinit(n) {
+			if n.isBlank() || !staticinit(n, out) {
 				if Debug['%'] != 0 {
 					Dump("nonstatic", defn)
 				}
-				s.append(defn)
+				*out = append(*out, defn)
 			}
 
 		case OAS2FUNC, OAS2MAPR, OAS2DOTTYPE, OAS2RECV:
@@ -144,28 +139,28 @@ func (s *InitSchedule) init1(n *Node) {
 			}
 			defn.SetInitorder(InitPending)
 			for _, n2 := range defn.Rlist.Slice() {
-				s.init1(n2)
+				init1(n2, out)
 			}
 			if Debug['%'] != 0 {
 				Dump("nonstatic", defn)
 			}
-			s.append(defn)
+			*out = append(*out, defn)
 			defn.SetInitorder(InitDone)
 		}
 	}
 
-	last := len(s.initlist) - 1
-	if s.initlist[last] != n {
-		Fatalf("bad initlist %v", s.initlist)
+	last := len(initlist) - 1
+	if initlist[last] != n {
+		Fatalf("bad initlist %v", initlist)
 	}
-	s.initlist[last] = nil // allow GC
-	s.initlist = s.initlist[:last]
+	initlist[last] = nil // allow GC
+	initlist = initlist[:last]
 
 	n.SetInitorder(InitDone)
 }
 
 // foundinitloop prints an init loop error and exits.
-func (s *InitSchedule) foundinitloop(node, visited *Node) {
+func foundinitloop(node, visited *Node) {
 	// If there have already been errors printed,
 	// those errors probably confused us and
 	// there might not be a loop. Let the user
@@ -177,9 +172,9 @@ func (s *InitSchedule) foundinitloop(node, visited *Node) {
 
 	// Find the index of node and visited in the initlist.
 	var nodeindex, visitedindex int
-	for ; s.initlist[nodeindex] != node; nodeindex++ {
+	for ; initlist[nodeindex] != node; nodeindex++ {
 	}
-	for ; s.initlist[visitedindex] != visited; visitedindex++ {
+	for ; initlist[visitedindex] != visited; visitedindex++ {
 	}
 
 	// There is a loop involving visited. We know about node and
@@ -187,12 +182,12 @@ func (s *InitSchedule) foundinitloop(node, visited *Node) {
 	fmt.Printf("%v: initialization loop:\n", visited.Line())
 
 	// Print visited -> ... -> n1 -> node.
-	for _, n := range s.initlist[visitedindex:] {
+	for _, n := range initlist[visitedindex:] {
 		fmt.Printf("\t%v %v refers to\n", n.Line(), n.Sym)
 	}
 
 	// Print node -> ... -> visited.
-	for _, n := range s.initlist[nodeindex:visitedindex] {
+	for _, n := range initlist[nodeindex:visitedindex] {
 		fmt.Printf("\t%v %v refers to\n", n.Line(), n.Sym)
 	}
 
@@ -201,7 +196,7 @@ func (s *InitSchedule) foundinitloop(node, visited *Node) {
 }
 
 // recurse over n, doing init1 everywhere.
-func (s *InitSchedule) init2(n *Node) {
+func init2(n *Node, out *[]*Node) {
 	if n == nil || n.Initorder() == InitDone {
 		return
 	}
@@ -210,38 +205,38 @@ func (s *InitSchedule) init2(n *Node) {
 		Fatalf("name %v with ninit: %+v\n", n.Sym, n)
 	}
 
-	s.init1(n)
-	s.init2(n.Left)
-	s.init2(n.Right)
-	s.init2list(n.Ninit)
-	s.init2list(n.List)
-	s.init2list(n.Rlist)
-	s.init2list(n.Nbody)
+	init1(n, out)
+	init2(n.Left, out)
+	init2(n.Right, out)
+	init2list(n.Ninit, out)
+	init2list(n.List, out)
+	init2list(n.Rlist, out)
+	init2list(n.Nbody, out)
 
 	switch n.Op {
 	case OCLOSURE:
-		s.init2list(n.Func.Closure.Nbody)
+		init2list(n.Func.Closure.Nbody, out)
 	case ODOTMETH, OCALLPART:
-		s.init2(asNode(n.Type.FuncType().Nname))
+		init2(asNode(n.Type.FuncType().Nname), out)
 	}
 }
 
-func (s *InitSchedule) init2list(l Nodes) {
+func init2list(l Nodes, out *[]*Node) {
 	for _, n := range l.Slice() {
-		s.init2(n)
+		init2(n, out)
 	}
 }
 
-func (s *InitSchedule) initreorder(l []*Node) {
+func initreorder(l []*Node, out *[]*Node) {
 	for _, n := range l {
 		switch n.Op {
 		case ODCLFUNC, ODCLCONST, ODCLTYPE:
 			continue
 		}
 
-		s.initreorder(n.Ninit.Slice())
+		initreorder(n.Ninit.Slice(), out)
 		n.Ninit.Set(nil)
-		s.init1(n)
+		init1(n, out)
 	}
 }
 
@@ -249,19 +244,18 @@ func (s *InitSchedule) initreorder(l []*Node) {
 // declarations and outputs the corresponding list of statements
 // to include in the init() function body.
 func initfix(l []*Node) []*Node {
-	s := InitSchedule{
-		initplans: make(map[*Node]*InitPlan),
-		inittemps: make(map[*Node]*Node),
-	}
+	var lout []*Node
+	initplans = make(map[*Node]*InitPlan)
 	lno := lineno
-	s.initreorder(l)
+	initreorder(l, &lout)
 	lineno = lno
-	return s.out
+	initplans = nil
+	return lout
 }
 
 // compilation of top-level (static) assignments
 // into DATA statements if at all possible.
-func (s *InitSchedule) staticinit(n *Node) bool {
+func staticinit(n *Node, out *[]*Node) bool {
 	if n.Op != ONAME || n.Class() != PEXTERN || n.Name.Defn == nil || n.Name.Defn.Op != OAS {
 		Fatalf("staticinit")
 	}
@@ -269,12 +263,12 @@ func (s *InitSchedule) staticinit(n *Node) bool {
 	lineno = n.Pos
 	l := n.Name.Defn.Left
 	r := n.Name.Defn.Right
-	return s.staticassign(l, r)
+	return staticassign(l, r, out)
 }
 
 // like staticassign but we are copying an already
 // initialized value r.
-func (s *InitSchedule) staticcopy(l *Node, r *Node) bool {
+func staticcopy(l *Node, r *Node, out *[]*Node) bool {
 	if r.Op != ONAME {
 		return false
 	}
@@ -300,12 +294,12 @@ func (s *InitSchedule) staticcopy(l *Node, r *Node) bool {
 
 	switch r.Op {
 	case ONAME:
-		if s.staticcopy(l, r) {
+		if staticcopy(l, r, out) {
 			return true
 		}
 		// We may have skipped past one or more OCONVNOPs, so
 		// use conv to ensure r is assignable to l (#13263).
-		s.append(nod(OAS, l, conv(r, l.Type)))
+		*out = append(*out, nod(OAS, l, conv(r, l.Type)))
 		return true
 
 	case OLITERAL:
@@ -326,13 +320,13 @@ func (s *InitSchedule) staticcopy(l *Node, r *Node) bool {
 		switch r.Left.Op {
 		case OARRAYLIT, OSLICELIT, OSTRUCTLIT, OMAPLIT:
 			// copy pointer
-			gdata(l, nod(OADDR, s.inittemps[r], nil), int(l.Type.Width))
+			gdata(l, nod(OADDR, inittemps[r], nil), int(l.Type.Width))
 			return true
 		}
 
 	case OSLICELIT:
 		// copy slice
-		a := s.inittemps[r]
+		a := inittemps[r]
 
 		n := l.copy()
 		n.Xoffset = l.Xoffset + int64(array_array)
@@ -344,7 +338,7 @@ func (s *InitSchedule) staticcopy(l *Node, r *Node) bool {
 		return true
 
 	case OARRAYLIT, OSTRUCTLIT:
-		p := s.initplans[r]
+		p := initplans[r]
 
 		n := l.copy()
 		for i := range p.E {
@@ -356,7 +350,7 @@ func (s *InitSchedule) staticcopy(l *Node, r *Node) bool {
 				continue
 			}
 			ll := n.sepcopy()
-			if s.staticcopy(ll, e.Expr) {
+			if staticcopy(ll, e.Expr, out) {
 				continue
 			}
 			// Requires computation, but we're
@@ -365,7 +359,7 @@ func (s *InitSchedule) staticcopy(l *Node, r *Node) bool {
 			rr.Type = ll.Type
 			rr.Xoffset += e.Xoffset
 			setlineno(rr)
-			s.append(nod(OAS, ll, rr))
+			*out = append(*out, nod(OAS, ll, rr))
 		}
 
 		return true
@@ -374,14 +368,14 @@ func (s *InitSchedule) staticcopy(l *Node, r *Node) bool {
 	return false
 }
 
-func (s *InitSchedule) staticassign(l *Node, r *Node) bool {
+func staticassign(l *Node, r *Node, out *[]*Node) bool {
 	for r.Op == OCONVNOP {
 		r = r.Left
 	}
 
 	switch r.Op {
 	case ONAME:
-		return s.staticcopy(l, r)
+		return staticcopy(l, r, out)
 
 	case OLITERAL:
 		if isZero(r) {
@@ -406,12 +400,12 @@ func (s *InitSchedule) staticassign(l *Node, r *Node) bool {
 			// Init pointer.
 			a := staticname(r.Left.Type)
 
-			s.inittemps[r] = a
+			inittemps[r] = a
 			gdata(l, nod(OADDR, a, nil), int(l.Type.Width))
 
 			// Init underlying literal.
-			if !s.staticassign(a, r.Left) {
-				s.append(nod(OAS, a, r.Left))
+			if !staticassign(a, r.Left, out) {
+				*out = append(*out, nod(OAS, a, r.Left))
 			}
 			return true
 		}
@@ -425,12 +419,12 @@ func (s *InitSchedule) staticassign(l *Node, r *Node) bool {
 		}
 
 	case OSLICELIT:
-		s.initplan(r)
+		initplan(r)
 		// Init slice.
 		bound := r.Right.Int64()
 		ta := types.NewArray(r.Type.Elem(), bound)
 		a := staticname(ta)
-		s.inittemps[r] = a
+		inittemps[r] = a
 		n := l.copy()
 		n.Xoffset = l.Xoffset + int64(array_array)
 		gdata(n, nod(OADDR, a, nil), Widthptr)
@@ -444,9 +438,9 @@ func (s *InitSchedule) staticassign(l *Node, r *Node) bool {
 		fallthrough
 
 	case OARRAYLIT, OSTRUCTLIT:
-		s.initplan(r)
+		initplan(r)
 
-		p := s.initplans[r]
+		p := initplans[r]
 		n := l.copy()
 		for i := range p.E {
 			e := &p.E[i]
@@ -458,8 +452,8 @@ func (s *InitSchedule) staticassign(l *Node, r *Node) bool {
 			}
 			setlineno(e.Expr)
 			a := n.sepcopy()
-			if !s.staticassign(a, e.Expr) {
-				s.append(nod(OAS, a, e.Expr))
+			if !staticassign(a, e.Expr, out) {
+				*out = append(*out, nod(OAS, a, e.Expr))
 			}
 		}
 
@@ -522,15 +516,15 @@ func (s *InitSchedule) staticassign(l *Node, r *Node) bool {
 			n.Type = val.Type
 			setlineno(val)
 			a := n.sepcopy()
-			if !s.staticassign(a, val) {
-				s.append(nod(OAS, a, val))
+			if !staticassign(a, val, out) {
+				*out = append(*out, nod(OAS, a, val))
 			}
 		} else {
 			// Construct temp to hold val, write pointer to temp into n.
 			a := staticname(val.Type)
-			s.inittemps[val] = a
-			if !s.staticassign(a, val) {
-				s.append(nod(OAS, a, val))
+			inittemps[val] = a
+			if !staticassign(a, val, out) {
+				*out = append(*out, nod(OAS, a, val))
 			}
 			ptr := nod(OADDR, a, nil)
 			n.Type = types.NewPtr(val.Type)
@@ -574,7 +568,7 @@ var statuniqgen int // name generator for static temps
 // returned node for readonly nodes.
 func staticname(t *types.Type) *Node {
 	// Don't use lookupN; it interns the resulting string, but these are all unique.
-	n := newname(lookup(fmt.Sprintf(".stmp_%d", statuniqgen)))
+	n := newname(lookup(fmt.Sprintf("statictmp_%d", statuniqgen)))
 	statuniqgen++
 	addvar(n, t, PEXTERN)
 	return n
@@ -735,7 +729,6 @@ func fixedlit(ctxt initContext, kind initKind, n *Node, var_ *Node, init *Nodes)
 			if r.Sym.IsBlank() {
 				return nblank, r.Left
 			}
-			setlineno(r)
 			return nodSym(ODOT, var_, r.Sym), r.Left
 		}
 	default:
@@ -763,7 +756,7 @@ func fixedlit(ctxt initContext, kind initKind, n *Node, var_ *Node, init *Nodes)
 		}
 
 		// build list of assignments: var[index] = expr
-		setlineno(a)
+		setlineno(value)
 		a = nod(OAS, a, value)
 		a = typecheck(a, ctxStmt)
 		switch kind {
@@ -1249,12 +1242,12 @@ func stataddr(nam *Node, n *Node) bool {
 	return false
 }
 
-func (s *InitSchedule) initplan(n *Node) {
-	if s.initplans[n] != nil {
+func initplan(n *Node) {
+	if initplans[n] != nil {
 		return
 	}
 	p := new(InitPlan)
-	s.initplans[n] = p
+	initplans[n] = p
 	switch n.Op {
 	default:
 		Fatalf("initplan")
@@ -1269,7 +1262,7 @@ func (s *InitSchedule) initplan(n *Node) {
 				}
 				a = a.Right
 			}
-			s.addvalue(p, k*n.Type.Elem().Width, a)
+			addvalue(p, k*n.Type.Elem().Width, a)
 			k++
 		}
 
@@ -1278,7 +1271,7 @@ func (s *InitSchedule) initplan(n *Node) {
 			if a.Op != OSTRUCTKEY {
 				Fatalf("initplan structlit")
 			}
-			s.addvalue(p, a.Xoffset, a.Left)
+			addvalue(p, a.Xoffset, a.Left)
 		}
 
 	case OMAPLIT:
@@ -1286,12 +1279,12 @@ func (s *InitSchedule) initplan(n *Node) {
 			if a.Op != OKEY {
 				Fatalf("initplan maplit")
 			}
-			s.addvalue(p, -1, a.Right)
+			addvalue(p, -1, a.Right)
 		}
 	}
 }
 
-func (s *InitSchedule) addvalue(p *InitPlan, xoffset int64, n *Node) {
+func addvalue(p *InitPlan, xoffset int64, n *Node) {
 	// special case: zero can be dropped entirely
 	if isZero(n) {
 		return
@@ -1299,8 +1292,8 @@ func (s *InitSchedule) addvalue(p *InitPlan, xoffset int64, n *Node) {
 
 	// special case: inline struct and array (not slice) literals
 	if isvaluelit(n) {
-		s.initplan(n)
-		q := s.initplans[n]
+		initplan(n)
+		q := initplans[n]
 		for _, qe := range q.E {
 			// qe is a copy; we are not modifying entries in q.E
 			qe.Xoffset += xoffset

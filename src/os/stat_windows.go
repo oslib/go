@@ -80,6 +80,7 @@ func stat(funcname, name string, createFileAttrs uint32) (FileInfo, error) {
 	if err == nil && fa.FileAttributes&syscall.FILE_ATTRIBUTE_REPARSE_POINT == 0 {
 		// Not a symlink.
 		fs := &fileStat{
+			path:           name,
 			FileAttributes: fa.FileAttributes,
 			CreationTime:   fa.CreationTime,
 			LastAccessTime: fa.LastAccessTime,
@@ -87,9 +88,14 @@ func stat(funcname, name string, createFileAttrs uint32) (FileInfo, error) {
 			FileSizeHigh:   fa.FileSizeHigh,
 			FileSizeLow:    fa.FileSizeLow,
 		}
-		if err := fs.saveInfoFromPath(name); err != nil {
-			return nil, err
+		// Gather full path to be used by os.SameFile later.
+		if !isAbs(fs.path) {
+			fs.path, err = syscall.FullPath(fs.path)
+			if err != nil {
+				return nil, &PathError{"FullPath", name, err}
+			}
 		}
+		fs.name = basename(name)
 		return fs, nil
 	}
 	// GetFileAttributesEx fails with ERROR_SHARING_VIOLATION error for
@@ -101,11 +107,7 @@ func stat(funcname, name string, createFileAttrs uint32) (FileInfo, error) {
 			return nil, &PathError{"FindFirstFile", name, err}
 		}
 		syscall.FindClose(sh)
-		fs := newFileStatFromWin32finddata(&fd)
-		if err := fs.saveInfoFromPath(name); err != nil {
-			return nil, err
-		}
-		return fs, nil
+		return newFileStatFromWin32finddata(&fd), nil
 	}
 
 	// Finally use CreateFile.

@@ -85,10 +85,10 @@ var (
 	Flag8           bool // use 64-bit addresses in symbol table
 	flagInterpreter = flag.String("I", "", "use `linker` as ELF dynamic linker")
 	FlagDebugTramp  = flag.Int("debugtramp", 0, "debug trampolines")
-	FlagStrictDups  = flag.Int("strictdups", 0, "sanity check duplicate symbol contents during object file reading (1=warn 2=err).")
 
 	FlagRound       = flag.Int("R", -1, "set address rounding `quantum`")
 	FlagTextAddr    = flag.Int64("T", -1, "set text segment `address`")
+	FlagDataAddr    = flag.Int64("D", -1, "set data segment `address`")
 	flagEntrySymbol = flag.String("E", "", "set `entry` symbol name")
 
 	cpuprofile     = flag.String("cpuprofile", "", "write cpu profile to `file`")
@@ -148,7 +148,6 @@ func Main(arch *sys.Arch, theArch Arch) {
 	if objabi.Fieldtrack_enabled != 0 {
 		ctxt.Reachparent = make(map[*sym.Symbol]*sym.Symbol)
 	}
-	checkStrictDups = *FlagStrictDups
 
 	startProfile()
 	if ctxt.BuildMode == BuildModeUnset {
@@ -182,7 +181,7 @@ func Main(arch *sys.Arch, theArch Arch) {
 	}
 
 	if ctxt.Debugvlog != 0 {
-		ctxt.Logf("HEADER = -H%d -T0x%x -R0x%x\n", ctxt.HeadType, uint64(*FlagTextAddr), uint32(*FlagRound))
+		ctxt.Logf("HEADER = -H%d -T0x%x -D0x%x -R0x%x\n", ctxt.HeadType, uint64(*FlagTextAddr), uint64(*FlagDataAddr), uint32(*FlagRound))
 	}
 
 	switch ctxt.BuildMode {

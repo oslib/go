@@ -38,9 +38,9 @@ type jsFile struct {
 
 var filesMu sync.Mutex
 var files = map[int]*jsFile{
-	0: {},
-	1: {},
-	2: {},
+	0: &jsFile{},
+	1: &jsFile{},
+	2: &jsFile{},
 }
 
 func fdToFile(fd int) (*jsFile, error) {
@@ -244,26 +244,18 @@ func Chown(path string, uid, gid int) error {
 	if err := checkPath(path); err != nil {
 		return err
 	}
-	_, err := fsCall("chown", path, uint32(uid), uint32(gid))
-	return err
+	return ENOSYS
 }
 
 func Fchown(fd int, uid, gid int) error {
-	_, err := fsCall("fchown", fd, uint32(uid), uint32(gid))
-	return err
+	return ENOSYS
 }
 
 func Lchown(path string, uid, gid int) error {
 	if err := checkPath(path); err != nil {
 		return err
 	}
-	if jsFS.Get("lchown") == js.Undefined() {
-		// fs.lchown is unavailable on Linux until Node.js 10.6.0
-		// TODO(neelance): remove when we require at least this Node.js version
-		return ENOSYS
-	}
-	_, err := fsCall("lchown", path, uint32(uid), uint32(gid))
-	return err
+	return ENOSYS
 }
 
 func UtimesNano(path string, ts []Timespec) error {

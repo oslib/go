@@ -109,8 +109,7 @@ func coverReport() {
 		}
 	}
 	if total == 0 {
-		fmt.Println("coverage: [no statements]")
-		return
+		total = 1
 	}
 	fmt.Printf("coverage: %.1f%% of statements%s\n", 100*float64(active)/float64(total), cover.CoveredPackages)
 }

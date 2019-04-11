@@ -18,10 +18,7 @@ import (
 )
 
 type dumpTest struct {
-	// Either Req or GetReq can be set/nil but not both.
-	Req    *http.Request
-	GetReq func() *http.Request
-
+	Req  http.Request
 	Body interface{} // optional []byte or func() io.ReadCloser to populate Req.Body
 
 	WantDump    string
@@ -32,7 +29,7 @@ type dumpTest struct {
 var dumpTests = []dumpTest{
 	// HTTP/1.1 => chunked coding; body; empty trailer
 	{
-		Req: &http.Request{
+		Req: http.Request{
 			Method: "GET",
 			URL: &url.URL{
 				Scheme: "http",
@@ -55,7 +52,7 @@ var dumpTests = []dumpTest{
 	// Verify that DumpRequest preserves the HTTP version number, doesn't add a Host,
 	// and doesn't add a User-Agent.
 	{
-		Req: &http.Request{
+		Req: http.Request{
 			Method:     "GET",
 			URL:        mustParseURL("/foo"),
 			ProtoMajor: 1,
@@ -70,7 +67,7 @@ var dumpTests = []dumpTest{
 	},
 
 	{
-		Req: mustNewRequest("GET", "http://example.com/foo", nil),
+		Req: *mustNewRequest("GET", "http://example.com/foo", nil),
 
 		WantDumpOut: "GET /foo HTTP/1.1\r\n" +
 			"Host: example.com\r\n" +
@@ -82,7 +79,8 @@ var dumpTests = []dumpTest{
 	// with a bytes.Buffer and hang with all goroutines not
 	// runnable.
 	{
-		Req: mustNewRequest("GET", "https://example.com/foo", nil),
+		Req: *mustNewRequest("GET", "https://example.com/foo", nil),
+
 		WantDumpOut: "GET /foo HTTP/1.1\r\n" +
 			"Host: example.com\r\n" +
 			"User-Agent: Go-http-client/1.1\r\n" +
@@ -91,7 +89,7 @@ var dumpTests = []dumpTest{
 
 	// Request with Body, but Dump requested without it.
 	{
-		Req: &http.Request{
+		Req: http.Request{
 			Method: "POST",
 			URL: &url.URL{
 				Scheme: "http",
@@ -116,7 +114,7 @@ var dumpTests = []dumpTest{
 
 	// Request with Body > 8196 (default buffer size)
 	{
-		Req: &http.Request{
+		Req: http.Request{
 			Method: "POST",
 			URL: &url.URL{
 				Scheme: "http",
@@ -147,10 +145,8 @@ var dumpTests = []dumpTest{
 	},
 
 	{
-		GetReq: func() *http.Request {
-			return mustReadRequest("GET http://foo.com/ HTTP/1.1\r\n" +
-				"User-Agent: blah\r\n\r\n")
-		},
+		Req: *mustReadRequest("GET http://foo.com/ HTTP/1.1\r\n" +
+			"User-Agent: blah\r\n\r\n"),
 		NoBody: true,
 		WantDump: "GET http://foo.com/ HTTP/1.1\r\n" +
 			"User-Agent: blah\r\n\r\n",
@@ -158,25 +154,22 @@ var dumpTests = []dumpTest{
 
 	// Issue #7215. DumpRequest should return the "Content-Length" when set
 	{
-		GetReq: func() *http.Request {
-			return mustReadRequest("POST /v2/api/?login HTTP/1.1\r\n" +
-				"Host: passport.myhost.com\r\n" +
-				"Content-Length: 3\r\n" +
-				"\r\nkey1=name1&key2=name2")
-		},
+		Req: *mustReadRequest("POST /v2/api/?login HTTP/1.1\r\n" +
+			"Host: passport.myhost.com\r\n" +
+			"Content-Length: 3\r\n" +
+			"\r\nkey1=name1&key2=name2"),
 		WantDump: "POST /v2/api/?login HTTP/1.1\r\n" +
 			"Host: passport.myhost.com\r\n" +
 			"Content-Length: 3\r\n" +
 			"\r\nkey",
 	},
+
 	// Issue #7215. DumpRequest should return the "Content-Length" in ReadRequest
 	{
-		GetReq: func() *http.Request {
-			return mustReadRequest("POST /v2/api/?login HTTP/1.1\r\n" +
-				"Host: passport.myhost.com\r\n" +
-				"Content-Length: 0\r\n" +
-				"\r\nkey1=name1&key2=name2")
-		},
+		Req: *mustReadRequest("POST /v2/api/?login HTTP/1.1\r\n" +
+			"Host: passport.myhost.com\r\n" +
+			"Content-Length: 0\r\n" +
+			"\r\nkey1=name1&key2=name2"),
 		WantDump: "POST /v2/api/?login HTTP/1.1\r\n" +
 			"Host: passport.myhost.com\r\n" +
 			"Content-Length: 0\r\n\r\n",
@@ -184,11 +177,9 @@ var dumpTests = []dumpTest{
 
 	// Issue #7215. DumpRequest should not return the "Content-Length" if unset
 	{
-		GetReq: func() *http.Request {
-			return mustReadRequest("POST /v2/api/?login HTTP/1.1\r\n" +
-				"Host: passport.myhost.com\r\n" +
-				"\r\nkey1=name1&key2=name2")
-		},
+		Req: *mustReadRequest("POST /v2/api/?login HTTP/1.1\r\n" +
+			"Host: passport.myhost.com\r\n" +
+			"\r\nkey1=name1&key2=name2"),
 		WantDump: "POST /v2/api/?login HTTP/1.1\r\n" +
 			"Host: passport.myhost.com\r\n\r\n",
 	},
@@ -196,7 +187,8 @@ var dumpTests = []dumpTest{
 	// Issue 18506: make drainBody recognize NoBody. Otherwise
 	// this was turning into a chunked request.
 	{
-		Req: mustNewRequest("POST", "http://example.com/foo", http.NoBody),
+		Req: *mustNewRequest("POST", "http://example.com/foo", http.NoBody),
+
 		WantDumpOut: "POST /foo HTTP/1.1\r\n" +
 			"Host: example.com\r\n" +
 			"User-Agent: Go-http-client/1.1\r\n" +
@@ -208,40 +200,28 @@ var dumpTests = []dumpTest{
 func TestDumpRequest(t *testing.T) {
 	numg0 := runtime.NumGoroutine()
 	for i, tt := range dumpTests {
-		if tt.Req != nil && tt.GetReq != nil || tt.Req == nil && tt.GetReq == nil {
-			t.Errorf("#%d: either .Req(%p) or .GetReq(%p) can be set/nil but not both", i, tt.Req, tt.GetReq)
-			continue
-		}
-
-		freshReq := func(ti dumpTest) *http.Request {
-			req := ti.Req
-			if req == nil {
-				req = ti.GetReq()
+		setBody := func() {
+			if tt.Body == nil {
+				return
 			}
-
-			if req.Header == nil {
-				req.Header = make(http.Header)
-			}
-
-			if ti.Body == nil {
-				return req
-			}
-			switch b := ti.Body.(type) {
+			switch b := tt.Body.(type) {
 			case []byte:
-				req.Body = ioutil.NopCloser(bytes.NewReader(b))
+				tt.Req.Body = ioutil.NopCloser(bytes.NewReader(b))
 			case func() io.ReadCloser:
-				req.Body = b()
+				tt.Req.Body = b()
 			default:
-				t.Fatalf("Test %d: unsupported Body of %T", i, ti.Body)
+				t.Fatalf("Test %d: unsupported Body of %T", i, tt.Body)
 			}
-			return req
+		}
+		if tt.Req.Header == nil {
+			tt.Req.Header = make(http.Header)
 		}
 
 		if tt.WantDump != "" {
-			req := freshReq(tt)
-			dump, err := DumpRequest(req, !tt.NoBody)
+			setBody()
+			dump, err := DumpRequest(&tt.Req, !tt.NoBody)
 			if err != nil {
-				t.Errorf("DumpRequest #%d: %s\nWantDump:\n%s", i, err, tt.WantDump)
+				t.Errorf("DumpRequest #%d: %s", i, err)
 				continue
 			}
 			if string(dump) != tt.WantDump {
@@ -251,8 +231,8 @@ func TestDumpRequest(t *testing.T) {
 		}
 
 		if tt.WantDumpOut != "" {
-			req := freshReq(tt)
-			dump, err := DumpRequestOut(req, !tt.NoBody)
+			setBody()
+			dump, err := DumpRequestOut(&tt.Req, !tt.NoBody)
 			if err != nil {
 				t.Errorf("DumpRequestOut #%d: %s", i, err)
 				continue

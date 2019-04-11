@@ -655,16 +655,12 @@ uintptr_t cfunc(callback f, uintptr_t n) {
 		r   uintptr
 		err syscall.Errno
 	}
-	want := result{
-		// Make it large enough to test issue #29331.
-		r:   (^uintptr(0)) >> 24,
-		err: 333,
-	}
 	c := make(chan result)
 	go func() {
-		r, _, err := proc.Call(cb, want.r)
+		r, _, err := proc.Call(cb, 100)
 		c <- result{r, err.(syscall.Errno)}
 	}()
+	want := result{r: 100, err: 333}
 	if got := <-c; got != want {
 		t.Errorf("got %d want %d", got, want)
 	}

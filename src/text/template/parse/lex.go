@@ -107,18 +107,17 @@ type stateFn func(*lexer) stateFn
 
 // lexer holds the state of the scanner.
 type lexer struct {
-	name           string    // the name of the input; used only for error reports
-	input          string    // the string being scanned
-	leftDelim      string    // start of action
-	rightDelim     string    // end of action
-	trimRightDelim string    // end of action with trim marker
-	pos            Pos       // current position in the input
-	start          Pos       // start position of this item
-	width          Pos       // width of last rune read from input
-	items          chan item // channel of scanned items
-	parenDepth     int       // nesting depth of ( ) exprs
-	line           int       // 1+number of newlines seen
-	startLine      int       // start line of this item
+	name       string    // the name of the input; used only for error reports
+	input      string    // the string being scanned
+	leftDelim  string    // start of action
+	rightDelim string    // end of action
+	pos        Pos       // current position in the input
+	start      Pos       // start position of this item
+	width      Pos       // width of last rune read from input
+	items      chan item // channel of scanned items
+	parenDepth int       // nesting depth of ( ) exprs
+	line       int       // 1+number of newlines seen
+	startLine  int       // start line of this item
 }
 
 // next returns the next rune in the input.
@@ -211,14 +210,13 @@ func lex(name, input, left, right string) *lexer {
 		right = rightDelim
 	}
 	l := &lexer{
-		name:           name,
-		input:          input,
-		leftDelim:      left,
-		rightDelim:     right,
-		trimRightDelim: rightTrimMarker + right,
-		items:          make(chan item),
-		line:           1,
-		startLine:      1,
+		name:       name,
+		input:      input,
+		leftDelim:  left,
+		rightDelim: right,
+		items:      make(chan item),
+		line:       1,
+		startLine:  1,
 	}
 	go l.run()
 	return l
@@ -277,11 +275,13 @@ func rightTrimLength(s string) Pos {
 
 // atRightDelim reports whether the lexer is at a right delimiter, possibly preceded by a trim marker.
 func (l *lexer) atRightDelim() (delim, trimSpaces bool) {
-	if strings.HasPrefix(l.input[l.pos:], l.trimRightDelim) { // With trim marker.
-		return true, true
-	}
-	if strings.HasPrefix(l.input[l.pos:], l.rightDelim) { // Without trim marker.
+	if strings.HasPrefix(l.input[l.pos:], l.rightDelim) {
 		return true, false
+	}
+	// The right delim might have the marker before.
+	if strings.HasPrefix(l.input[l.pos:], rightTrimMarker) &&
+		strings.HasPrefix(l.input[l.pos+trimMarkerLen:], l.rightDelim) {
+		return true, true
 	}
 	return false, false
 }
@@ -366,7 +366,6 @@ func lexInsideAction(l *lexer) stateFn {
 	case r == eof || isEndOfLine(r):
 		return l.errorf("unclosed action")
 	case isSpace(r):
-		l.backup() // Put space back in case we have " -}}".
 		return lexSpace
 	case r == '=':
 		l.emit(itemAssign)
@@ -419,26 +418,10 @@ func lexInsideAction(l *lexer) stateFn {
 }
 
 // lexSpace scans a run of space characters.
-// We have not consumed the first space, which is known to be present.
-// Take care if there is a trim-marked right delimiter, which starts with a space.
+// One space has already been seen.
 func lexSpace(l *lexer) stateFn {
-	var r rune
-	var numSpaces int
-	for {
-		r = l.peek()
-		if !isSpace(r) {
-			break
-		}
+	for isSpace(l.peek()) {
 		l.next()
-		numSpaces++
-	}
-	// Be careful about a trim-marked closing delimiter, which has a minus
-	// after a space. We know there is a space, so check for the '-' that might follow.
-	if strings.HasPrefix(l.input[l.pos-1:], l.trimRightDelim) {
-		l.backup() // Before the space.
-		if numSpaces == 1 {
-			return lexRightDelim // On the delim, so go right to that.
-		}
 	}
 	l.emit(itemSpace)
 	return lexInsideAction
@@ -582,28 +565,17 @@ func (l *lexer) scanNumber() bool {
 	// Optional leading sign.
 	l.accept("+-")
 	// Is it hex?
-	digits := "0123456789_"
-	if l.accept("0") {
-		// Note: Leading 0 does not mean octal in floats.
-		if l.accept("xX") {
-			digits = "0123456789abcdefABCDEF_"
-		} else if l.accept("oO") {
-			digits = "01234567_"
-		} else if l.accept("bB") {
-			digits = "01_"
-		}
+	digits := "0123456789"
+	if l.accept("0") && l.accept("xX") {
+		digits = "0123456789abcdefABCDEF"
 	}
 	l.acceptRun(digits)
 	if l.accept(".") {
 		l.acceptRun(digits)
 	}
-	if len(digits) == 10+1 && l.accept("eE") {
+	if l.accept("eE") {
 		l.accept("+-")
-		l.acceptRun("0123456789_")
-	}
-	if len(digits) == 16+6+1 && l.accept("pP") {
-		l.accept("+-")
-		l.acceptRun("0123456789_")
+		l.acceptRun("0123456789")
 	}
 	// Is it imaginary?
 	l.accept("i")

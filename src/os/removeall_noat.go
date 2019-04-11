@@ -56,30 +56,8 @@ func removeAll(path string) error {
 			return err
 		}
 
-		const reqSize = 1024
-		var names []string
-		var readErr error
-
-		for {
-			numErr := 0
-			names, readErr = fd.Readdirnames(reqSize)
-
-			for _, name := range names {
-				err1 := RemoveAll(path + string(PathSeparator) + name)
-				if err == nil {
-					err = err1
-				}
-				if err1 != nil {
-					numErr++
-				}
-			}
-
-			// If we can delete any entry, break to start new iteration.
-			// Otherwise, we discard current names, get next entries and try deleting them.
-			if numErr != reqSize {
-				break
-			}
-		}
+		const request = 1024
+		names, err1 := fd.Readdirnames(request)
 
 		// Removing files from the directory may have caused
 		// the OS to reshuffle it. Simply calling Readdirnames
@@ -88,12 +66,19 @@ func removeAll(path string) error {
 		// directory. See issue 20841.
 		fd.Close()
 
-		if readErr == io.EOF {
+		for _, name := range names {
+			err1 := RemoveAll(path + string(PathSeparator) + name)
+			if err == nil {
+				err = err1
+			}
+		}
+
+		if err1 == io.EOF {
 			break
 		}
 		// If Readdirnames returned an error, use it.
 		if err == nil {
-			err = readErr
+			err = err1
 		}
 		if len(names) == 0 {
 			break
@@ -103,7 +88,7 @@ func removeAll(path string) error {
 		// got fewer than request names from Readdirnames, try
 		// simply removing the directory now. If that
 		// succeeds, we are done.
-		if len(names) < reqSize {
+		if len(names) < request {
 			err1 := Remove(path)
 			if err1 == nil || IsNotExist(err1) {
 				return nil
@@ -124,7 +109,6 @@ func removeAll(path string) error {
 
 	// Remove directory.
 	err1 := Remove(path)
-	err1 = removeAllTestHook(err1)
 	if err1 == nil || IsNotExist(err1) {
 		return nil
 	}

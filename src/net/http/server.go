@@ -29,7 +29,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"golang.org/x/net/http/httpguts"
+	"internal/x/net/http/httpguts"
 )
 
 // Errors used by the HTTP server.
@@ -749,8 +749,10 @@ func (cr *connReader) handleReadError(_ error) {
 // may be called from multiple goroutines.
 func (cr *connReader) closeNotify() {
 	res, _ := cr.conn.curReq.Load().(*response)
-	if res != nil && atomic.CompareAndSwapInt32(&res.didCloseNotify, 0, 1) {
-		res.closeNotifyCh <- true
+	if res != nil {
+		if atomic.CompareAndSwapInt32(&res.didCloseNotify, 0, 1) {
+			res.closeNotifyCh <- true
+		}
 	}
 }
 
@@ -2028,7 +2030,7 @@ func StripPrefix(prefix string, h Handler) Handler {
 			*r2 = *r
 			r2.URL = new(url.URL)
 			*r2.URL = *r.URL
-			r2.URL.Path = cleanPath(p)
+			r2.URL.Path = p
 			h.ServeHTTP(w, r2)
 		} else {
 			NotFound(w, r)
@@ -2792,7 +2794,7 @@ func (srv *Server) ListenAndServe() error {
 	if err != nil {
 		return err
 	}
-	return srv.Serve(ln)
+	return srv.Serve(tcpKeepAliveListener{ln.(*net.TCPListener)})
 }
 
 var testHookServerServe func(*Server, net.Listener) // used if non-nil
@@ -3076,7 +3078,7 @@ func (srv *Server) ListenAndServeTLS(certFile, keyFile string) error {
 
 	defer ln.Close()
 
-	return srv.ServeTLS(ln, certFile, keyFile)
+	return srv.ServeTLS(tcpKeepAliveListener{ln.(*net.TCPListener)}, certFile, keyFile)
 }
 
 // setupHTTP2_ServeTLS conditionally configures HTTP/2 on
@@ -3221,25 +3223,6 @@ type timeoutWriter struct {
 	code        int
 }
 
-var _ Pusher = (*timeoutWriter)(nil)
-var _ Flusher = (*timeoutWriter)(nil)
-
-// Push implements the Pusher interface.
-func (tw *timeoutWriter) Push(target string, opts *PushOptions) error {
-	if pusher, ok := tw.w.(Pusher); ok {
-		return pusher.Push(target, opts)
-	}
-	return ErrNotSupported
-}
-
-// Flush implements the Flusher interface.
-func (tw *timeoutWriter) Flush() {
-	f, ok := tw.w.(Flusher)
-	if ok {
-		f.Flush()
-	}
-}
-
 func (tw *timeoutWriter) Header() Header { return tw.h }
 
 func (tw *timeoutWriter) Write(p []byte) (int, error) {
@@ -3267,6 +3250,24 @@ func (tw *timeoutWriter) WriteHeader(code int) {
 func (tw *timeoutWriter) writeHeader(code int) {
 	tw.wroteHeader = true
 	tw.code = code
+}
+
+// tcpKeepAliveListener sets TCP keep-alive timeouts on accepted
+// connections. It's used by ListenAndServe and ListenAndServeTLS so
+// dead TCP connections (e.g. closing laptop mid-download) eventually
+// go away.
+type tcpKeepAliveListener struct {
+	*net.TCPListener
+}
+
+func (ln tcpKeepAliveListener) Accept() (net.Conn, error) {
+	tc, err := ln.AcceptTCP()
+	if err != nil {
+		return nil, err
+	}
+	tc.SetKeepAlive(true)
+	tc.SetKeepAlivePeriod(3 * time.Minute)
+	return tc, nil
 }
 
 // onceCloseListener wraps a net.Listener, protecting it from

@@ -7,7 +7,6 @@ package asm
 import (
 	"bytes"
 	"fmt"
-	"strconv"
 	"text/scanner"
 
 	"cmd/asm/internal/arch"
@@ -201,11 +200,7 @@ func (p *Parser) asmData(operands [][]lex.Token) {
 		p.errorf("expect /size for DATA argument")
 		return
 	}
-	szop := op[n-1].String()
-	sz, err := strconv.Atoi(szop)
-	if err != nil {
-		p.errorf("bad size for DATA argument: %q", szop)
-	}
+	scale := p.parseScale(op[n-1].String())
 	op = op[:n-2]
 	nameAddr := p.address(op)
 	if !p.validSymbol("DATA", &nameAddr, true) {
@@ -228,33 +223,24 @@ func (p *Parser) asmData(operands [][]lex.Token) {
 		p.errorf("overlapping DATA entry for %s", name)
 		return
 	}
-	p.dataAddr[name] = nameAddr.Offset + int64(sz)
+	p.dataAddr[name] = nameAddr.Offset + int64(scale)
 
 	switch valueAddr.Type {
 	case obj.TYPE_CONST:
-		switch sz {
-		case 1, 2, 4, 8:
-			nameAddr.Sym.WriteInt(p.ctxt, nameAddr.Offset, int(sz), valueAddr.Offset)
-		default:
-			p.errorf("bad int size for DATA argument: %d", sz)
-		}
+		nameAddr.Sym.WriteInt(p.ctxt, nameAddr.Offset, int(scale), valueAddr.Offset)
 	case obj.TYPE_FCONST:
-		switch sz {
+		switch scale {
 		case 4:
 			nameAddr.Sym.WriteFloat32(p.ctxt, nameAddr.Offset, float32(valueAddr.Val.(float64)))
 		case 8:
 			nameAddr.Sym.WriteFloat64(p.ctxt, nameAddr.Offset, valueAddr.Val.(float64))
 		default:
-			p.errorf("bad float size for DATA argument: %d", sz)
+			panic("bad float scale")
 		}
 	case obj.TYPE_SCONST:
-		nameAddr.Sym.WriteString(p.ctxt, nameAddr.Offset, int(sz), valueAddr.Val.(string))
+		nameAddr.Sym.WriteString(p.ctxt, nameAddr.Offset, int(scale), valueAddr.Val.(string))
 	case obj.TYPE_ADDR:
-		if sz == p.arch.PtrSize {
-			nameAddr.Sym.WriteAddr(p.ctxt, nameAddr.Offset, int(sz), valueAddr.Sym, valueAddr.Offset)
-		} else {
-			p.errorf("bad addr size for DATA argument: %d", sz)
-		}
+		nameAddr.Sym.WriteAddr(p.ctxt, nameAddr.Offset, int(scale), valueAddr.Sym, valueAddr.Offset)
 	}
 }
 

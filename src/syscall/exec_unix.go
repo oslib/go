@@ -9,7 +9,6 @@
 package syscall
 
 import (
-	"internal/bytealg"
 	"runtime"
 	"sync"
 	"unsafe"
@@ -82,21 +81,15 @@ func StringSlicePtr(ss []string) []*byte {
 // pointers to NUL-terminated byte arrays. If any string contains
 // a NUL byte, it returns (nil, EINVAL).
 func SlicePtrFromStrings(ss []string) ([]*byte, error) {
-	n := 0
-	for _, s := range ss {
-		if bytealg.IndexByteString(s, 0) != -1 {
-			return nil, EINVAL
-		}
-		n += len(s) + 1 // +1 for NUL
-	}
+	var err error
 	bb := make([]*byte, len(ss)+1)
-	b := make([]byte, n)
-	n = 0
-	for i, s := range ss {
-		bb[i] = &b[n]
-		copy(b[n:], s)
-		n += len(s) + 1
+	for i := 0; i < len(ss); i++ {
+		bb[i], err = BytePtrFromString(ss[i])
+		if err != nil {
+			return nil, err
+		}
 	}
+	bb[len(ss)] = nil
 	return bb, nil
 }
 

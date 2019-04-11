@@ -546,27 +546,6 @@ var execTests = []execTest{
 	{"error method, error", "{{.MyError true}}", "", tVal, false},
 	{"error method, no error", "{{.MyError false}}", "false", tVal, true},
 
-	// Numbers
-	{"decimal", "{{print 1234}}", "1234", tVal, true},
-	{"decimal _", "{{print 12_34}}", "1234", tVal, true},
-	{"binary", "{{print 0b101}}", "5", tVal, true},
-	{"binary _", "{{print 0b_1_0_1}}", "5", tVal, true},
-	{"BINARY", "{{print 0B101}}", "5", tVal, true},
-	{"octal0", "{{print 0377}}", "255", tVal, true},
-	{"octal", "{{print 0o377}}", "255", tVal, true},
-	{"octal _", "{{print 0o_3_7_7}}", "255", tVal, true},
-	{"OCTAL", "{{print 0O377}}", "255", tVal, true},
-	{"hex", "{{print 0x123}}", "291", tVal, true},
-	{"hex _", "{{print 0x1_23}}", "291", tVal, true},
-	{"HEX", "{{print 0X123ABC}}", "1194684", tVal, true},
-	{"float", "{{print 123.4}}", "123.4", tVal, true},
-	{"float _", "{{print 0_0_1_2_3.4}}", "123.4", tVal, true},
-	{"hex float", "{{print +0x1.ep+2}}", "7.5", tVal, true},
-	{"hex float _", "{{print +0x_1.e_0p+0_2}}", "7.5", tVal, true},
-	{"HEX float", "{{print +0X1.EP+2}}", "7.5", tVal, true},
-	{"print multi", "{{print 1_2_3_4 7.5_00_00_00}}", "1234 7.5", tVal, true},
-	{"print multi2", "{{print 1234 0x0_1.e_0p+02}}", "1234 7.5", tVal, true},
-
 	// Fixed bugs.
 	// Must separate dot and receiver; otherwise args are evaluated with dot set to variable.
 	{"bug0", "{{range .MSIone}}{{if $.Method1 .}}X{{end}}{{end}}", "X", tVal, true},
@@ -1353,64 +1332,20 @@ func TestBlock(t *testing.T) {
 	}
 }
 
-func TestEvalFieldErrors(t *testing.T) {
-	tests := []struct {
-		name, src string
-		value     interface{}
-		want      string
-	}{
-		{
-			// Check that calling an invalid field on nil pointer
-			// prints a field error instead of a distracting nil
-			// pointer error. https://golang.org/issue/15125
-			"MissingFieldOnNil",
-			"{{.MissingField}}",
-			(*T)(nil),
-			"can't evaluate field MissingField in type *template.T",
-		},
-		{
-			"MissingFieldOnNonNil",
-			"{{.MissingField}}",
-			&T{},
-			"can't evaluate field MissingField in type *template.T",
-		},
-		{
-			"ExistingFieldOnNil",
-			"{{.X}}",
-			(*T)(nil),
-			"nil pointer evaluating *template.T.X",
-		},
-		{
-			"MissingKeyOnNilMap",
-			"{{.MissingKey}}",
-			(*map[string]string)(nil),
-			"nil pointer evaluating *map[string]string.MissingKey",
-		},
-		{
-			"MissingKeyOnNilMapPtr",
-			"{{.MissingKey}}",
-			(*map[string]string)(nil),
-			"nil pointer evaluating *map[string]string.MissingKey",
-		},
-		{
-			"MissingKeyOnMapPtrToNil",
-			"{{.MissingKey}}",
-			&map[string]string{},
-			"<nil>",
-		},
+// Check that calling an invalid field on nil pointer prints
+// a field error instead of a distracting nil pointer error.
+// https://golang.org/issue/15125
+func TestMissingFieldOnNil(t *testing.T) {
+	tmpl := Must(New("tmpl").Parse("{{.MissingField}}"))
+	var d *T
+	err := tmpl.Execute(ioutil.Discard, d)
+	got := "<nil>"
+	if err != nil {
+		got = err.Error()
 	}
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			tmpl := Must(New("tmpl").Parse(tc.src))
-			err := tmpl.Execute(ioutil.Discard, tc.value)
-			got := "<nil>"
-			if err != nil {
-				got = err.Error()
-			}
-			if !strings.HasSuffix(got, tc.want) {
-				t.Fatalf("got error %q, want %q", got, tc.want)
-			}
-		})
+	want := "can't evaluate field MissingField in type *template.T"
+	if !strings.HasSuffix(got, want) {
+		t.Errorf("got error %q, want %q", got, want)
 	}
 }
 

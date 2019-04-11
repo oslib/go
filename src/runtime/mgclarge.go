@@ -134,19 +134,16 @@ func checkTreapNode(t *treapNode) {
 			return t.npagesKey < npages
 		}
 		// t.npagesKey == npages
-		return t.spanKey.base() < s.base()
+		return uintptr(unsafe.Pointer(t.spanKey)) < uintptr(unsafe.Pointer(s))
 	}
 
 	if t == nil {
 		return
 	}
-	if t.spanKey.next != nil || t.spanKey.prev != nil || t.spanKey.list != nil {
-		throw("span may be on an mSpanList while simultaneously in the treap")
-	}
-	if t.spanKey.npages != t.npagesKey {
+	if t.spanKey.npages != t.npagesKey || t.spanKey.next != nil {
 		println("runtime: checkTreapNode treapNode t=", t, "     t.npagesKey=", t.npagesKey,
 			"t.spanKey.npages=", t.spanKey.npages)
-		throw("span.npages and treap.npagesKey do not match")
+		throw("why does span.npages and treap.ngagesKey do not match?")
 	}
 	if t.left != nil && lessThan(t.left.npagesKey, t.left.spanKey) {
 		throw("t.lessThan(t.left.npagesKey, t.left.spanKey) is not false")
@@ -298,16 +295,13 @@ func (root *mTreap) removeNode(t *treapNode) {
 	mheap_.treapalloc.free(unsafe.Pointer(t))
 }
 
-// find searches for, finds, and returns the treap iterator representing
-// the position of the smallest span that can hold npages. If no span has
-// at least npages it returns an invalid iterator.
+// find searches for, finds, and returns the treap node containing the
+// smallest span that can hold npages. If no span has at least npages
+// it returns nil.
 // This is slightly more complicated than a simple binary tree search
 // since if an exact match is not found the next larger node is
 // returned.
-// TODO(mknyszek): It turns out this routine does not actually find the
-// best-fit span, so either fix that or move to something else first, and
-// evaluate the performance implications of doing so.
-func (root *mTreap) find(npages uintptr) treapIter {
+func (root *mTreap) find(npages uintptr) *treapNode {
 	t := root.treap
 	for t != nil {
 		if t.spanKey == nil {
@@ -318,10 +312,10 @@ func (root *mTreap) find(npages uintptr) treapIter {
 		} else if t.left != nil && t.left.npagesKey >= npages {
 			t = t.left
 		} else {
-			return treapIter{t}
+			return t
 		}
 	}
-	return treapIter{}
+	return nil
 }
 
 // removeSpan searches for, finds, deletes span along with

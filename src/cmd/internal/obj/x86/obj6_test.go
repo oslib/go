@@ -99,8 +99,7 @@ func asmOutput(t *testing.T, s string) []byte {
 		testenv.GoToolPath(t), "tool", "asm", "-S", "-dynlink",
 		"-o", filepath.Join(tmpdir, "output.6"), tmpfile.Name())
 
-	cmd.Env = append(os.Environ(),
-		"GOARCH=amd64", "GOOS=linux", "GOPATH="+filepath.Join(tmpdir, "_gopath"))
+	cmd.Env = append(os.Environ(), "GOARCH=amd64", "GOOS=linux")
 	asmout, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("error %s output %s", err, asmout)

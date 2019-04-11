@@ -20,8 +20,6 @@ func canInternalLink() bool {
 		case "arm64", "mips64", "mips64le", "mips", "mipsle", "ppc64", "ppc64le":
 			return false
 		}
-	case "aix":
-		return false
 	}
 	return true
 }

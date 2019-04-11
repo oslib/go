@@ -15,7 +15,7 @@ import (
 
 const (
 	offsetS390xHasVX  = unsafe.Offsetof(cpu.S390X.HasVX)
-	offsetS390xHasVE1 = unsafe.Offsetof(cpu.S390X.HasVXE)
+	offsetS390xHasVE1 = unsafe.Offsetof(cpu.S390X.HasVE1)
 )
 
 type p256CurveFast struct {

@@ -11,7 +11,6 @@ import (
 	"io/ioutil"
 	"strconv"
 	"strings"
-	"sync"
 )
 
 // A Reader implements convenience methods for reading requests
@@ -28,7 +27,6 @@ type Reader struct {
 // should be reading from an io.LimitReader or similar Reader to bound
 // the size of responses.
 func NewReader(r *bufio.Reader) *Reader {
-	commonHeaderOnce.Do(initCommonHeader)
 	return &Reader{R: r}
 }
 
@@ -573,8 +571,6 @@ func (r *Reader) upcomingHeaderNewlines() (n int) {
 // If s contains a space or invalid header field bytes, it is
 // returned without modifications.
 func CanonicalMIMEHeaderKey(s string) string {
-	commonHeaderOnce.Do(initCommonHeader)
-
 	// Quick check for canonical encoding.
 	upper := true
 	for i := 0; i < len(s); i++ {
@@ -646,12 +642,9 @@ func canonicalMIMEHeaderKey(a []byte) string {
 }
 
 // commonHeader interns common header strings.
-var commonHeader map[string]string
+var commonHeader = make(map[string]string)
 
-var commonHeaderOnce sync.Once
-
-func initCommonHeader() {
-	commonHeader = make(map[string]string)
+func init() {
 	for _, v := range []string{
 		"Accept",
 		"Accept-Charset",

@@ -24,8 +24,8 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
-	"golang.org/x/crypto/cryptobyte"
-	cryptobyte_asn1 "golang.org/x/crypto/cryptobyte/asn1"
+	"internal/x/crypto/cryptobyte"
+	cryptobyte_asn1 "internal/x/crypto/cryptobyte/asn1"
 	"io"
 	"math/big"
 	"net"
@@ -54,9 +54,6 @@ type pkixPublicKey struct {
 func ParsePKIXPublicKey(derBytes []byte) (pub interface{}, err error) {
 	var pki publicKeyInfo
 	if rest, err := asn1.Unmarshal(derBytes, &pki); err != nil {
-		if _, err := asn1.Unmarshal(derBytes, &pkcs1PublicKey{}); err == nil {
-			return nil, errors.New("x509: failed to parse public key (use ParsePKCS1PublicKey instead for this key format)")
-		}
 		return nil, err
 	} else if len(rest) != 0 {
 		return nil, errors.New("x509: trailing data after ASN.1 of public-key")
@@ -1930,7 +1927,7 @@ func buildExtensions(template *Certificate, subjectIsEmpty bool, authorityKeyId 
 			dp := distributionPoint{
 				DistributionPoint: distributionPointName{
 					FullName: []asn1.RawValue{
-						{Tag: 6, Class: 2, Bytes: []byte(name)},
+						asn1.RawValue{Tag: 6, Class: 2, Bytes: []byte(name)},
 					},
 				},
 			}
@@ -2278,7 +2275,7 @@ type CertificateRequest struct {
 	// Attributes contains the CSR attributes that can parse as
 	// pkix.AttributeTypeAndValueSET.
 	//
-	// Deprecated: Use Extensions and ExtraExtensions instead for parsing and
+	// Deprecated: use Extensions and ExtraExtensions instead for parsing and
 	// generating the requestedExtensions attribute.
 	Attributes []pkix.AttributeTypeAndValueSET
 

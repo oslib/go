@@ -858,7 +858,7 @@ func mallocgc(size uintptr, typ *_type, needzero bool) unsafe.Pointer {
 	dataSize := size
 	c := gomcache()
 	var x unsafe.Pointer
-	noscan := typ == nil || typ.ptrdata == 0
+	noscan := typ == nil || typ.kind&kindNoPointers != 0
 	if size <= maxSmallSize {
 		if noscan && size < maxTinySize {
 			// Tiny allocator.
@@ -1073,11 +1073,6 @@ func reflect_unsafe_New(typ *_type) unsafe.Pointer {
 	return mallocgc(typ.size, typ, true)
 }
 
-//go:linkname reflectlite_unsafe_New internal/reflectlite.unsafe_New
-func reflectlite_unsafe_New(typ *_type) unsafe.Pointer {
-	return mallocgc(typ.size, typ, true)
-}
-
 // newarray allocates an array of n elements of type typ.
 func newarray(typ *_type, n int) unsafe.Pointer {
 	if n == 1 {
@@ -1248,7 +1243,7 @@ func persistentalloc1(size, align uintptr, sysStat *uint64) *notInHeap {
 				break
 			}
 		}
-		persistent.off = round(sys.PtrSize, align)
+		persistent.off = sys.PtrSize
 	}
 	p := persistent.base.add(persistent.off)
 	persistent.off += size

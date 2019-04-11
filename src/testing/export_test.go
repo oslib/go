@@ -4,4 +4,7 @@
 
 package testing
 
-var PrettyPrint = prettyPrint
+var (
+	RoundDown10 = roundDown10
+	RoundUp     = roundUp
+)

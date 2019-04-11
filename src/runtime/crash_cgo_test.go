@@ -90,9 +90,9 @@ func TestCgoExternalThreadSIGPROF(t *testing.T) {
 	case "plan9", "windows":
 		t.Skipf("no pthreads on %s", runtime.GOOS)
 	}
-	if runtime.GOARCH == "ppc64" && runtime.GOOS == "linux" {
+	if runtime.GOARCH == "ppc64" {
 		// TODO(austin) External linking not implemented on
-		// linux/ppc64 (issue #8912)
+		// ppc64 (issue #8912)
 		t.Skipf("no external linking on ppc64")
 	}
 

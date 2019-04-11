@@ -178,6 +178,9 @@ var supportedSignatureAlgorithms = []SignatureScheme{
 	ECDSAWithSHA1,
 }
 
+// RSA-PSS is disabled in TLS 1.2 for Go 1.12. See Issue 30055.
+var supportedSignatureAlgorithmsTLS12 = supportedSignatureAlgorithms[3:]
+
 // helloRetryRequestRandom is set as the Random value of a ServerHello
 // to signal that the message is actually a HelloRetryRequest.
 var helloRetryRequestRandom = []byte{ // See RFC 8446, Section 4.1.3.
@@ -776,7 +779,7 @@ func (c *Config) supportedVersions(isClient bool) []uint16 {
 		if isClient && v < VersionTLS10 {
 			continue
 		}
-		// TLS 1.3 is opt-out in Go 1.13.
+		// TLS 1.3 is opt-in in Go 1.12.
 		if v == VersionTLS13 && !isTLS13Supported() {
 			continue
 		}
@@ -791,11 +794,11 @@ var tls13Support struct {
 	cached bool
 }
 
-// isTLS13Supported returns whether the program enabled TLS 1.3 by not opting
-// out with GODEBUG=tls13=0. It's cached after the first execution.
+// isTLS13Supported returns whether the program opted into TLS 1.3 via
+// GODEBUG=tls13=1. It's cached after the first execution.
 func isTLS13Supported() bool {
 	tls13Support.Do(func() {
-		tls13Support.cached = goDebugString("tls13") != "0"
+		tls13Support.cached = goDebugString("tls13") == "1"
 	})
 	return tls13Support.cached
 }

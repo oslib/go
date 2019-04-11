@@ -108,9 +108,12 @@ type timespec struct {
 	_       [4]byte // EABI
 }
 
-//go:nosplit
-func (ts *timespec) setNsec(ns int64) {
-	ts.tv_sec = int64(timediv(ns, 1e9, &ts.tv_nsec))
+func (ts *timespec) set_sec(x int32) {
+	ts.tv_sec = int64(x)
+}
+
+func (ts *timespec) set_nsec(x int32) {
+	ts.tv_nsec = x
 }
 
 type timeval struct {

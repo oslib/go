@@ -34,6 +34,7 @@ const (
 
 	kindDirectIface = 1 << 5
 	kindGCProg      = 1 << 6
+	kindNoPointers  = 1 << 7
 	kindMask        = (1 << 5) - 1
 )
 

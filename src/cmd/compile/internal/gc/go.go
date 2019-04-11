@@ -295,14 +295,14 @@ var (
 	growslice,
 	msanread,
 	msanwrite,
-	newobject,
 	newproc,
 	panicdivide,
-	panicshift,
 	panicdottypeE,
 	panicdottypeI,
+	panicindex,
 	panicnildottype,
 	panicoverflow,
+	panicslice,
 	raceread,
 	racereadrange,
 	racewrite,
@@ -313,11 +313,7 @@ var (
 	typedmemclr,
 	typedmemmove,
 	Udiv,
-	writeBarrier,
-	zerobaseSym *obj.LSym
-
-	BoundsCheckFunc [ssa.BoundsKindCount]*obj.LSym
-	ExtendCheckFunc [ssa.BoundsKindCount]*obj.LSym
+	writeBarrier *obj.LSym
 
 	// GO386=387
 	ControlWord64trunc,

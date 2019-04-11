@@ -296,7 +296,6 @@ func sigtrampgo(sig uint32, info *siginfo, ctx unsafe.Pointer) {
 			sigprofNonGoPC(c.sigpc())
 			return
 		}
-		c.fixsigcode(sig)
 		badsignal(uintptr(sig), c)
 		return
 	}
@@ -504,14 +503,16 @@ func raisebadsignal(sig uint32, c *sigctxt) {
 
 //go:nosplit
 func crash() {
-	// OS X core dumps are linear dumps of the mapped memory,
-	// from the first virtual byte to the last, with zeros in the gaps.
-	// Because of the way we arrange the address space on 64-bit systems,
-	// this means the OS X core file will be >128 GB and even on a zippy
-	// workstation can take OS X well over an hour to write (uninterruptible).
-	// Save users from making that mistake.
-	if GOOS == "darwin" && GOARCH == "amd64" {
-		return
+	if GOOS == "darwin" {
+		// OS X core dumps are linear dumps of the mapped memory,
+		// from the first virtual byte to the last, with zeros in the gaps.
+		// Because of the way we arrange the address space on 64-bit systems,
+		// this means the OS X core file will be >128 GB and even on a zippy
+		// workstation can take OS X well over an hour to write (uninterruptible).
+		// Save users from making that mistake.
+		if GOARCH == "amd64" {
+			return
+		}
 	}
 
 	dieFromSignal(_SIGABRT)
