@@ -37,6 +37,7 @@ func ( cc C2 ) Wow() string {
 
 func main() {
     var hi Hi = new(Hello)   
+    Println()
     hi.Init() 
 
     var c C1 = new( C1 )  
@@ -46,5 +47,5 @@ func main() {
     cc.C2( "World", hi.Huh() ) 
 
     Println( cc.Wow() )
-    Printf( "\nWelcome to Go++ - the friendlier golang...\n\n" )  
+    Printf( "\nWelcome to Go++ - The friendlier golang...\n\n" )  
 }
