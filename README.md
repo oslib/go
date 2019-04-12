@@ -10,11 +10,11 @@ Unless otherwise noted, the Go++ source files are distributed under the BSD-styl
 
 ### Download and Install
 
-To give Go++ a spin, you will need to download the source files from github and build a new version of the compilers and related tools. First, clone a copy of the guthub repository: 
+To give Go++ a spin, you will need to download the source files from github and build a new version of the compilers and related tools. First, clone a copy of the github repository: 
 ```
 > git clone https://github.com/oslib/gopp.git go++
 ```
-This step is exactly the same on the three supported platforms, Linux, Mac, and Windows (basically, the only ones that have been tested). The "go++" directory can be any local name or, if omitted, it will default to the git supported name "gopp" (git does not support the "++" special characters when naming repositories). 
+This step is exactly the same on the three supported platforms, Linux, Mac, and Windows (basically, the only ones that have been tested). The "go++" directory can be any local name or, if omitted, it will default to the git supported name "gopp" (git does not allow the "++" special characters when naming repositories). 
 
 The next step is a short form of the golang bootstrap process. It starts with a binary installation of the base golang environment, and must match the exact release version that was used as the initial branch (currently 1.12.3). These files may be retrieved from the official binary distributions available at https://golang.org/dl/. 
 
@@ -29,7 +29,7 @@ Of course, this step is a little different on each platform, but is most easily 
 > export GOROOT=~/go++  
 > export GOPATH= 
 ```
-The export command should work for Linux and Mac. On windows the "set" command would be used to accomplish the same result. On each platform these variable may be setup as permanent for each new session with GOROOT pointing to the go++ directory, and GOPATH set to whatever directory is being used for local development. The Go++ compiler should be fully backwards compatible and be able to compile any standard golang packages (with the exception of conflicts with new keywords added for the Go++ language). 
+The "export" command should work for Linux and Mac. On windows the "set" command would be used to accomplish the same result. On each platform these variable may be setup as permanent for each new session with GOROOT pointing to the go++ directory, and GOPATH set to whatever directory is being used for local development. The Go++ compiler should be fully backwards compatible and be able to compile any standard golang packages (with the exception of conflicts with new keywords added for the Go++ language). 
 
 The last step is to build the Go++ compiler and related tools: 
 ```
