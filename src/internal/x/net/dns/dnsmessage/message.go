@@ -429,13 +429,13 @@ func (p *Parser) Question() (Question, error) {
 	if err != nil {
 		return Question{}, &nestedError{"unpacking Question.Type", err}
 	}
-	class, off, err := unpackClass(p.msg, off)
+	qclass, off, err := unpackClass(p.msg, off)
 	if err != nil {
 		return Question{}, &nestedError{"unpacking Question.Class", err}
 	}
 	p.off = off
 	p.index++
-	return Question{name, typ, class}, nil
+	return Question{name, typ, qclass}, nil
 }
 
 // AllQuestions parses all Questions.

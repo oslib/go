@@ -8,7 +8,7 @@
 // See also ``A Layman's Guide to a Subset of ASN.1, BER, and DER,''
 // http://luca.ntop.org/Teaching/Appunti/asn1.html.
 package asn1
-
+ 
 // ASN.1 is a syntax for specifying abstract objects and BER, DER, PER, XER etc
 // are different encoding formats for those objects. Here, we'll be dealing
 // with DER, the Distinguished Encoding Rules. DER is used in X.509 because
@@ -504,7 +504,7 @@ func parseTagAndLength(bytes []byte, initOffset int) (ret tagAndLength, offset i
 	}
 	b := bytes[offset]
 	offset++
-	ret.class = int(b >> 6)
+	ret.tclass = int(b >> 6)
 	ret.isCompound = b&0x20 == 0x20
 	ret.tag = int(b & 0x1f)
 
@@ -599,7 +599,7 @@ func parseSequenceOf(bytes []byte, sliceType reflect.Type, elemType reflect.Type
 			t.tag = TagUTCTime
 		}
 
-		if !matchAny && (t.class != ClassUniversal || t.isCompound != compoundType || t.tag != expectedTag) {
+		if !matchAny && (t.tclass != ClassUniversal || t.isCompound != compoundType || t.tag != expectedTag) {
 			err = StructuralError{"sequence tag mismatch"}
 			return
 		}
@@ -666,7 +666,7 @@ func parseField(v reflect.Value, bytes []byte, initOffset int, params fieldParam
 			return
 		}
 		var result interface{}
-		if !t.isCompound && t.class == ClassUniversal {
+		if !t.isCompound && t.tclass == ClassUniversal {
 			innerBytes := bytes[offset : offset+t.length]
 			switch t.tag {
 			case TagPrintableString:
@@ -718,7 +718,7 @@ func parseField(v reflect.Value, bytes []byte, initOffset int, params fieldParam
 			err = StructuralError{"explicit tag has no child"}
 			return
 		}
-		if t.class == expectedClass && t.tag == *params.tag && (t.length == 0 || t.isCompound) {
+		if t.tclass == expectedClass && t.tag == *params.tag && (t.length == 0 || t.isCompound) {
 			if fieldType == rawValueType {
 				// The inner element should not be parsed for RawValues.
 			} else if t.length > 0 {
@@ -757,7 +757,7 @@ func parseField(v reflect.Value, bytes []byte, initOffset int, params fieldParam
 	// when it sees a string, so if we see a different string type on the
 	// wire, we change the universal type to match.
 	if universalTag == TagPrintableString {
-		if t.class == ClassUniversal {
+		if t.tclass == ClassUniversal {
 			switch t.tag {
 			case TagIA5String, TagGeneralString, TagT61String, TagUTF8String, TagNumericString:
 				universalTag = t.tag
@@ -769,7 +769,7 @@ func parseField(v reflect.Value, bytes []byte, initOffset int, params fieldParam
 
 	// Special case for time: UTCTime and GeneralizedTime both map to the
 	// Go type time.Time.
-	if universalTag == TagUTCTime && t.tag == TagGeneralizedTime && t.class == ClassUniversal {
+	if universalTag == TagUTCTime && t.tag == TagGeneralizedTime && t.tclass == ClassUniversal {
 		universalTag = TagGeneralizedTime
 	}
 
@@ -800,7 +800,7 @@ func parseField(v reflect.Value, bytes []byte, initOffset int, params fieldParam
 	}
 
 	// We have unwrapped any explicit tagging at this point.
-	if !matchAnyClassAndTag && (t.class != expectedClass || t.tag != expectedTag) ||
+	if !matchAnyClassAndTag && (t.tclass != expectedClass || t.tag != expectedTag) ||
 		(!matchAny && t.isCompound != compoundType) {
 		// Tags don't match. Again, it could be an optional element.
 		ok := setDefaultValue(v, params)
@@ -821,7 +821,7 @@ func parseField(v reflect.Value, bytes []byte, initOffset int, params fieldParam
 	// We deal with the structures defined in this package first.
 	switch fieldType {
 	case rawValueType:
-		result := RawValue{t.class, t.tag, t.isCompound, innerBytes, bytes[initOffset:offset]}
+		result := RawValue{t.tclass, t.tag, t.isCompound, innerBytes, bytes[initOffset:offset]}
 		v.Set(reflect.ValueOf(result))
 		return
 	case objectIdentifierType:

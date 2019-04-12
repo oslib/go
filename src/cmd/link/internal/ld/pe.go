@@ -616,7 +616,7 @@ dwarfLoop:
 
 // writeSymbol appends symbol s to file f symbol table.
 // It also sets s.Dynid to written symbol number.
-func (f *peFile) writeSymbol(out *OutBuf, s *sym.Symbol, value int64, sectidx int, typ uint16, class uint8) {
+func (f *peFile) writeSymbol(out *OutBuf, s *sym.Symbol, value int64, sectidx int, typ uint16, sclass uint8) {
 	if len(s.Name) > 8 {
 		out.Write32(0)
 		out.Write32(uint32(f.stringTable.add(s.Name)))
@@ -626,7 +626,7 @@ func (f *peFile) writeSymbol(out *OutBuf, s *sym.Symbol, value int64, sectidx in
 	out.Write32(uint32(value))
 	out.Write16(uint16(sectidx))
 	out.Write16(typ)
-	out.Write8(class)
+	out.Write8(sclass)
 	out.Write8(0) // no aux entries
 
 	s.Dynid = int32(f.symbolCount)
@@ -703,11 +703,11 @@ func (f *peFile) writeSymbols(ctxt *Link) {
 				Errorf(s, "addpesym: %v", err)
 			}
 		}
-		class := IMAGE_SYM_CLASS_EXTERNAL
+		sclass := IMAGE_SYM_CLASS_EXTERNAL
 		if s.IsFileLocal() || s.Attr.VisibilityHidden() || s.Attr.Local() {
-			class = IMAGE_SYM_CLASS_STATIC
+			sclass = IMAGE_SYM_CLASS_STATIC
 		}
-		f.writeSymbol(ctxt.Out, s, value, sect, typ, uint8(class))
+		f.writeSymbol(ctxt.Out, s, value, sect, typ, uint8(sclass))
 	}
 
 	if ctxt.LinkMode == LinkExternal {

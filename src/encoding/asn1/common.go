@@ -48,7 +48,7 @@ const (
 )
 
 type tagAndLength struct {
-	class, tag, length int
+	tclass, tag, length int
 	isCompound         bool
 }
 

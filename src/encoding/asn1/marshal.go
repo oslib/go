@@ -204,7 +204,7 @@ func lengthLength(i int) (numBytes int) {
 }
 
 func appendTagAndLength(dst []byte, t tagAndLength) []byte {
-	b := uint8(t.class) << 6
+	b := uint8(t.tclass) << 6
 	if t.isCompound {
 		b |= 0x20
 	}
@@ -627,14 +627,14 @@ func makeField(v reflect.Value, params fieldParameters) (e encoder, err error) {
 
 	bodyLen := t.body.Len()
 
-	class := ClassUniversal
+	classtyp := ClassUniversal
 	if params.tag != nil {
 		if params.application {
-			class = ClassApplication
+			classtyp = ClassApplication
 		} else if params.private {
-			class = ClassPrivate
+			classtyp = ClassPrivate
 		} else {
-			class = ClassContextSpecific
+			classtyp = ClassContextSpecific
 		}
 
 		if params.explicit {
@@ -645,7 +645,7 @@ func makeField(v reflect.Value, params fieldParameters) (e encoder, err error) {
 			tt.body = t
 
 			tt.tag = bytesEncoder(appendTagAndLength(tt.scratch[:0], tagAndLength{
-				class:      class,
+				tclass:      classtyp,
 				tag:        *params.tag,
 				length:     bodyLen + t.tag.Len(),
 				isCompound: true,
@@ -658,7 +658,7 @@ func makeField(v reflect.Value, params fieldParameters) (e encoder, err error) {
 		tag = *params.tag
 	}
 
-	t.tag = bytesEncoder(appendTagAndLength(t.scratch[:0], tagAndLength{class, tag, bodyLen, isCompound}))
+	t.tag = bytesEncoder(appendTagAndLength(t.scratch[:0], tagAndLength{classtyp, tag, bodyLen, isCompound}))
 
 	return t, nil
 }
