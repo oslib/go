@@ -1,10 +1,10 @@
-# The Go Programming Language
+# The Go++ Programming Language
 
-Go is an open source programming language that makes it easy to build simple,
+Go++ is a derivative of the popular open source programming language that makes it easy to build simple,
 reliable, and efficient software.
 
-![Gopher image](doc/gopher/fiveyears.jpg)
-*Gopher image by [Renee French][rf], licensed under [Creative Commons 3.0 Attributions license][cc3-by].*
+![Go++ image](doc/gopher/Go++.jpg)
+*Go++ image by [Glenn Fiedler]  [https://gafferongames.com/post/shape_of_the_go_stone].*
 
 Our canonical Git repository is located at https://go.googlesource.com/go.
 There is a mirror of the repository at https://github.com/golang/go.
