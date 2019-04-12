@@ -1373,7 +1373,7 @@ func (p *parser) parseClassChar(s, wholeClass string) (r rune, rest string, err 
 
 type charGroup struct {
 	sign  int
-	class []rune
+	rclass []rune
 }
 
 // parsePerlClassEscape parses a leading Perl character class escape like \d
@@ -1414,13 +1414,13 @@ func (p *parser) parseNamedClass(s string, r []rune) (out []rune, rest string, e
 func (p *parser) appendGroup(r []rune, g charGroup) []rune {
 	if p.flags&FoldCase == 0 {
 		if g.sign < 0 {
-			r = appendNegatedClass(r, g.class)
+			r = appendNegatedClass(r, g.rclass)
 		} else {
-			r = appendClass(r, g.class)
+			r = appendClass(r, g.rclass)
 		}
 	} else {
 		tmp := p.tmpClass[:0]
-		tmp = appendFoldedClass(tmp, g.class)
+		tmp = appendFoldedClass(tmp, g.rclass)
 		p.tmpClass = tmp
 		tmp = cleanClass(&p.tmpClass)
 		if g.sign < 0 {
@@ -1547,7 +1547,7 @@ func (p *parser) parseClass(s string) (rest string, err error) {
 		}
 	}
 
-	class := re.Rune
+	rclass := re.Rune
 	first := true // ] and - are okay as first char in class
 	for t == "" || t[0] != ']' || first {
 		// POSIX: - is only okay unescaped as first or last in class.
@@ -1560,29 +1560,29 @@ func (p *parser) parseClass(s string) (rest string, err error) {
 
 		// Look for POSIX [:alnum:] etc.
 		if len(t) > 2 && t[0] == '[' && t[1] == ':' {
-			nclass, nt, err := p.parseNamedClass(t, class)
+			nclass, nt, err := p.parseNamedClass(t, rclass)
 			if err != nil {
 				return "", err
 			}
 			if nclass != nil {
-				class, t = nclass, nt
+				rclass, t = nclass, nt
 				continue
 			}
 		}
 
 		// Look for Unicode character group like \p{Han}.
-		nclass, nt, err := p.parseUnicodeClass(t, class)
+		nclass, nt, err := p.parseUnicodeClass(t, rclass)
 		if err != nil {
 			return "", err
 		}
 		if nclass != nil {
-			class, t = nclass, nt
+			rclass, t = nclass, nt
 			continue
 		}
 
 		// Look for Perl character class symbols (extension).
-		if nclass, nt := p.parsePerlClassEscape(t, class); nclass != nil {
-			class, t = nclass, nt
+		if nclass, nt := p.parsePerlClassEscape(t, rclass); nclass != nil {
+			rclass, t = nclass, nt
 			continue
 		}
 
@@ -1605,20 +1605,20 @@ func (p *parser) parseClass(s string) (rest string, err error) {
 			}
 		}
 		if p.flags&FoldCase == 0 {
-			class = appendRange(class, lo, hi)
+			rclass = appendRange( rclass, lo, hi)
 		} else {
-			class = appendFoldedRange(class, lo, hi)
+			rclass = appendFoldedRange(rclass, lo, hi)
 		}
 	}
 	t = t[1:] // chop ]
 
 	// Use &re.Rune instead of &class to avoid allocation.
-	re.Rune = class
-	class = cleanClass(&re.Rune)
+	re.Rune = rclass
+	rclass = cleanClass(&re.Rune)
 	if sign < 0 {
-		class = negateClass(class)
+		rclass = negateClass(rclass)
 	}
-	re.Rune = class
+	re.Rune = rclass
 	p.push(re)
 	return t, nil
 }

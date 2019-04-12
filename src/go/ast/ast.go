@@ -162,6 +162,7 @@ type Field struct {
 	Type    Expr          // field/method/parameter type
 	Tag     *BasicLit     // field tag; or nil
 	Comment *CommentGroup // line comments; or nil
+	Member  bool 
 }
 
 func (f *Field) Pos() token.Pos {
@@ -379,13 +380,15 @@ type (
 		Lbrack token.Pos // position of "["
 		Len    Expr      // Ellipsis node for [...]T array types, nil for slice types
 		Elt    Expr      // element type
+		IsSliceOf   bool // sliceof keyword was used
 	}
 
 	// A StructType node represents a struct type.
 	StructType struct {
 		Struct     token.Pos  // position of "struct" keyword
 		Fields     *FieldList // list of field declarations
-		Incomplete bool       // true if (source) fields are missing in the Fields list
+		Incomplete bool       // true if (source) fields are missing in the Fields list 
+		ImpList    []*Ident   
 	}
 
 	// Pointer types are represented via StarExpr nodes.
@@ -403,6 +406,15 @@ type (
 		Methods    *FieldList // list of methods
 		Incomplete bool       // true if (source) methods are missing in the Methods list
 	}
+
+	ClassType struct { 
+		Class       token.Pos 
+		Members     *FieldList   // list of members and methods 
+		Incomplete  bool     // TODO: What???? 
+		ImpList     []*Ident  
+		ExtList     []*Ident  
+	}
+
 
 	// A MapType node represents a map type.
 	MapType struct {
@@ -452,6 +464,7 @@ func (x *FuncType) Pos() token.Pos {
 	return x.Params.Pos() // interface method declarations have no "func" keyword
 }
 func (x *InterfaceType) Pos() token.Pos { return x.Interface }
+func (x *ClassType) Pos() token.Pos { return x.Class } 
 func (x *MapType) Pos() token.Pos       { return x.Map }
 func (x *ChanType) Pos() token.Pos      { return x.Begin }
 
@@ -485,6 +498,7 @@ func (x *FuncType) End() token.Pos {
 	return x.Params.End()
 }
 func (x *InterfaceType) End() token.Pos { return x.Methods.End() }
+func (x *ClassType) End() token.Pos     { return x.Members.End() } 
 func (x *MapType) End() token.Pos       { return x.Value.End() }
 func (x *ChanType) End() token.Pos      { return x.Value.End() }
 
@@ -511,7 +525,8 @@ func (*KeyValueExpr) exprNode()   {}
 func (*ArrayType) exprNode()     {}
 func (*StructType) exprNode()    {}
 func (*FuncType) exprNode()      {}
-func (*InterfaceType) exprNode() {}
+func (*InterfaceType) exprNode() {} 
+func (*ClassType) exprNode()     {} 
 func (*MapType) exprNode()       {}
 func (*ChanType) exprNode()      {}
 
@@ -651,6 +666,7 @@ type (
 		Cond Expr      // condition
 		Body *BlockStmt
 		Else Stmt // else branch; or nil
+		ElseOnNewLine bool  // else is on next line 
 	}
 
 	// A CaseClause represents a case of an expression or type switch statement.
@@ -698,6 +714,7 @@ type (
 		Cond Expr      // condition; or nil
 		Post Stmt      // post iteration statement; or nil
 		Body *BlockStmt
+		Keyword token.Token // Was it a while or a standard for 
 	}
 
 	// A RangeStmt represents a for statement with a range clause.
@@ -708,6 +725,7 @@ type (
 		Tok        token.Token // ILLEGAL if Key == nil, ASSIGN, DEFINE
 		X          Expr        // value to range over
 		Body       *BlockStmt
+		Keyword    token.Token 
 	}
 )
 

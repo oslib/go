@@ -696,8 +696,17 @@ scanAgain:
 	insertSemi := false
 	switch ch := s.ch; {
 	case isLetter(ch):
-		lit = s.scanIdentifier()
-		if len(lit) > 1 {
+		lit = s.scanIdentifier() 
+        if lit == "AND" { 
+            tok = token.TAND 
+        } else 
+        if lit == "OR" {
+            tok = token.TOR 
+        } else
+        if lit == "NOT" { 
+            tok = token.TNOT 
+        } else
+        if len(lit) > 1 {
 			// keywords are longer than one letter - avoid lookup otherwise
 			tok = token.Lookup(lit)
 			switch tok {
@@ -822,16 +831,16 @@ scanAgain:
 		case '=':
 			tok = s.switch2(token.ASSIGN, token.EQL)
 		case '!':
-			tok = s.switch2(token.NOT, token.NEQ)
+			tok = s.switch2(token.NOTop, token.NEQ)
 		case '&':
 			if s.ch == '^' {
 				s.next()
 				tok = s.switch2(token.AND_NOT, token.AND_NOT_ASSIGN)
 			} else {
-				tok = s.switch3(token.AND, token.AND_ASSIGN, '&', token.LAND)
+				tok = s.switch3(token.ANDop, token.AND_ASSIGN, '&', token.LAND)
 			}
 		case '|':
-			tok = s.switch3(token.OR, token.OR_ASSIGN, '|', token.LOR)
+			tok = s.switch3(token.ORop, token.OR_ASSIGN, '|', token.LOR)
 		default:
 			// next reports unexpected BOMs - don't repeat
 			if ch != bom {

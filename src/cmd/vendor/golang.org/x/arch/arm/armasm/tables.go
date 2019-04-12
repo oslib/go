@@ -95,7 +95,7 @@ const (
 	AND_LT
 	AND_GT
 	AND_LE
-	AND
+	ANDop
 	AND_ZZ
 	AND_S_EQ
 	AND_S_NE
@@ -4722,7 +4722,7 @@ var opstr = [...]string{
 	AND_LT:            "AND.LT",
 	AND_GT:            "AND.GT",
 	AND_LE:            "AND.LE",
-	AND:               "AND",
+	ANDop:             "AND",
 	AND_ZZ:            "AND.ZZ",
 	AND_S_EQ:          "AND.S.EQ",
 	AND_S_NE:          "AND.S.NE",

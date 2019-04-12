@@ -166,7 +166,7 @@ func typecheckswitch(n *Node) {
 						// reset to original type
 						n1 = n.Left.Right
 						ls[i1] = n1
-					case !n1.Type.IsInterface() && t.IsInterface() && !implements(n1.Type, t, &missing, &have, &ptr):
+					case !n1.Type.IsInterface() && t.IsInterface() && !chk_implements(n1.Type, t, &missing, &have, &ptr):
 						if have != nil && !missing.Broke() && !have.Broke() {
 							yyerrorl(ncase.Pos, "impossible type switch case: %L cannot have dynamic type %v"+
 								" (wrong type for %v method)\n\thave %v%S\n\twant %v%S", n.Left.Right, n1.Type, missing.Sym, have.Sym, have.Type, missing.Sym, missing.Type)

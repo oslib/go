@@ -2316,7 +2316,7 @@ func (v Value) assignTo(context string, dst *rtype, target unsafe.Pointer) Value
 		fl |= flag(dst.Kind())
 		return Value{dst, v.ptr, fl}
 
-	case implements(dst, v.typ):
+	case chk_implements(dst, v.typ):
 		if target == nil {
 			target = unsafe_New(dst)
 		}
@@ -2426,7 +2426,7 @@ func convertOp(dst, src *rtype) func(Value, Type) Value {
 		return cvtDirect
 	}
 
-	if implements(dst, src) {
+	if chk_implements(dst, src) {
 		if src.Kind() == Interface {
 			return cvtI2I
 		}

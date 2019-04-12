@@ -164,6 +164,55 @@ type Type struct {
 	flags bitset8
 }
 
+
+type TypeInfo struct { 
+	IsNamed bool 
+	IsPtr bool 
+	IsInterface bool 
+	IsClass bool 
+	TypeName string 
+	Pkg *Pkg 
+} 
+
+
+func ( ti *TypeInfo ) TypeInfo( t *Type ) { 
+	ti.IsPtr = false 
+	ti.IsInterface = false 
+	ti.IsNamed = false 
+	ti.TypeName = ""
+	ti.Pkg = nil 
+ 
+	if t == nil { return } 
+	if t.Extra == nil { return } 
+
+	switch ex := t.Extra.(type) { 
+		case Ptr :  
+			ti.TypeInfo( ex.Elem ) 
+			ti.IsPtr = true 
+		case *Interface :  
+			ti.IsInterface = true 
+			if ex.IsClass { 
+				ti.IsClass = true 
+			} 
+			if t.Sym == nil { return } 
+			ti.IsNamed = true 
+			ti.TypeName = t.Sym.Name 
+			ti.Pkg = t.Pkg()   
+		case *Struct : 
+			if ex.IsClass { 
+				ti.IsClass = true 
+			}	
+			if t.Sym == nil { return } 
+			ti.IsNamed = true 
+			ti.TypeName = t.Sym.Name 
+			ti.Pkg = t.Pkg() 
+		default: 
+			ti.TypeName = fmt.Sprintf( "%T", t.Extra ) 
+	}
+} 
+
+
+
 const (
 	typeNotInHeap  = 1 << iota // type cannot be heap allocated
 	typeBroke                  // broken type definition
@@ -279,6 +328,7 @@ type Struct struct {
 	Map *Type
 
 	Funarg Funarg // type of function arguments for arg struct
+	IsClass bool 
 }
 
 // Fnstruct records the kind of function argument
@@ -301,6 +351,7 @@ func (t *Type) StructType() *Struct {
 type Interface struct {
 	Fields Fields
 	pkg    *Pkg
+	IsClass bool 
 }
 
 // Ptr contains Type fields specific to pointer types.
@@ -1303,6 +1354,18 @@ func (t *Type) IsStruct() bool {
 func (t *Type) IsInterface() bool {
 	return t.Etype == TINTER
 }
+
+
+func (t *Type) IsClass() bool { 
+	switch typ := t.Extra.(type) { 
+	case *Interface : 
+		return typ.IsClass 
+	case *Struct : 
+		return typ.IsClass 
+	}
+	return false 
+}   
+
 
 // IsEmptyInterface reports whether t is an empty interface type.
 func (t *Type) IsEmptyInterface() bool {

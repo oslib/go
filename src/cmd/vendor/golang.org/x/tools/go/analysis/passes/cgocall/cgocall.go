@@ -93,7 +93,7 @@ func checkCgo(fset *token.FileSet, f *ast.File, info *types.Info, reportf func(t
 				isUnsafePointer(info, conv.Fun) {
 				arg = conv.Args[0]
 			}
-			if u, ok := arg.(*ast.UnaryExpr); ok && u.Op == token.AND {
+			if u, ok := arg.(*ast.UnaryExpr); ok && u.Op == token.ANDop {
 				if !typeOKForCgoCall(cgoBaseType(info, u.X), make(map[types.Type]bool)) {
 					reportf(arg.Pos(), "possibly passing Go type with embedded pointer to C")
 					break
@@ -324,7 +324,7 @@ func cgoBaseType(info *types.Info, arg ast.Expr) types.Type {
 		}
 		// Here arg is *(*unsafe.Pointer)(unsafe.Pointer(v))
 		u, ok := call.Args[0].(*ast.UnaryExpr)
-		if !ok || u.Op != token.AND {
+		if !ok || u.Op != token.ANDop {
 			break
 		}
 		// Here arg is *(*unsafe.Pointer)(unsafe.Pointer(&v))

@@ -42,25 +42,30 @@ const (
 	// keywords
 	_Break       // break
 	_Case        // case
+	_Class       // class 
 	_Chan        // chan
 	_Const       // const
 	_Continue    // continue
 	_Default     // default
 	_Defer       // defer
 	_Else        // else
+	_Extends     // extends 
 	_Fallthrough // fallthrough
 	_For         // for
+	_While       // while
 	_Func        // func
 	_Go          // go
 	_Goto        // goto
 	_If          // if
 	_Import      // import
 	_Interface   // interface
+	_Implements  // implements 
 	_Map         // map
 	_Package     // package
 	_Range       // range
 	_Return      // return
 	_Select      // select
+	_Sliceof     // sliceof
 	_Struct      // struct
 	_Switch      // switch
 	_Type        // type
@@ -110,13 +115,15 @@ const (
 	// Def is the : in :=
 	Def  // :
 	Not  // !
+	TNot // NOT
 	Recv // <-
 
 	// precOrOr
 	OrOr // ||
-
+	TOr  // OR 
 	// precAndAnd
 	AndAnd // &&
+	TAnd   // AND
 
 	// precCmp
 	Eql // ==

@@ -235,6 +235,7 @@ const (
 	signatureType
 	structType
 	interfaceType
+	classType
 )
 
 func iexport(out *bufio.Writer) {
@@ -646,6 +647,10 @@ func (w *exportWriter) doTyp(t *types.Type) {
 		w.signature(t)
 
 	case TSTRUCT:
+		sclass := t.Extra.(*types.Struct) 
+		if sclass.IsClass { 
+			w.startType( classType )
+		} 
 		w.startType(structType)
 		w.setPkg(t.Pkg(), true)
 
@@ -659,6 +664,11 @@ func (w *exportWriter) doTyp(t *types.Type) {
 		}
 
 	case TINTER:
+		iface := t.Extra.(*types.Interface) 
+		if iface.IsClass { 
+			w.startType( classType ) // Next type (interfaceType) isa class 
+		}
+
 		var embeddeds, methods []*types.Field
 		for _, m := range t.Methods().Slice() {
 			if m.Sym != nil {

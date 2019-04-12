@@ -38,8 +38,8 @@ const (
 	QUO // /
 	REM // %
 
-	AND     // &
-	OR      // |
+	ANDop   // &
+	ORop    // |
 	XOR     // ^
 	SHL     // <<
 	SHR     // >>
@@ -59,7 +59,9 @@ const (
 	AND_NOT_ASSIGN // &^=
 
 	LAND  // &&
-	LOR   // ||
+	TAND  // AND
+	LOR   // || 
+	TOR   // OR
 	ARROW // <-
 	INC   // ++
 	DEC   // --
@@ -68,8 +70,8 @@ const (
 	LSS    // <
 	GTR    // >
 	ASSIGN // =
-	NOT    // !
-
+	NOTop   // !
+	TNOT   // NOT 
 	NEQ      // !=
 	LEQ      // <=
 	GEQ      // >=
@@ -94,14 +96,17 @@ const (
 	BREAK
 	CASE
 	CHAN
+	CLASS
 	CONST
 	CONTINUE
 
 	DEFAULT
 	DEFER
 	ELSE
+	EXTENDS 
 	FALLTHROUGH
 	FOR
+	WHILE
 
 	FUNC
 	GO
@@ -109,7 +114,8 @@ const (
 	IF
 	IMPORT
 
-	INTERFACE
+	INTERFACE 
+	IMPLEMENTS
 	MAP
 	PACKAGE
 	RANGE
@@ -118,6 +124,7 @@ const (
 	SELECT
 	STRUCT
 	SWITCH
+	SLICEOF
 	TYPE
 	VAR
 	keyword_end
@@ -142,8 +149,8 @@ var tokens = [...]string{
 	QUO: "/",
 	REM: "%",
 
-	AND:     "&",
-	OR:      "|",
+	ANDop:   "&",
+	ORop:    "|",
 	XOR:     "^",
 	SHL:     "<<",
 	SHR:     ">>",
@@ -162,8 +169,10 @@ var tokens = [...]string{
 	SHR_ASSIGN:     ">>=",
 	AND_NOT_ASSIGN: "&^=",
 
-	LAND:  "&&",
+	LAND:  "&&", 
+	TAND:  "AND",
 	LOR:   "||",
+	TOR:   "OR", 
 	ARROW: "<-",
 	INC:   "++",
 	DEC:   "--",
@@ -172,7 +181,8 @@ var tokens = [...]string{
 	LSS:    "<",
 	GTR:    ">",
 	ASSIGN: "=",
-	NOT:    "!",
+	NOTop:  "!",
+	TNOT:   "NOT", 
 
 	NEQ:      "!=",
 	LEQ:      "<=",
@@ -194,6 +204,7 @@ var tokens = [...]string{
 
 	BREAK:    "break",
 	CASE:     "case",
+	CLASS:    "class", 
 	CHAN:     "chan",
 	CONST:    "const",
 	CONTINUE: "continue",
@@ -201,8 +212,10 @@ var tokens = [...]string{
 	DEFAULT:     "default",
 	DEFER:       "defer",
 	ELSE:        "else",
+	EXTENDS:     "extends", 
 	FALLTHROUGH: "fallthrough",
 	FOR:         "for",
+	WHILE:       "while",
 
 	FUNC:   "func",
 	GO:     "go",
@@ -210,7 +223,8 @@ var tokens = [...]string{
 	IF:     "if",
 	IMPORT: "import",
 
-	INTERFACE: "interface",
+	INTERFACE:  "interface",
+	IMPLEMENTS: "implements", 
 	MAP:       "map",
 	PACKAGE:   "package",
 	RANGE:     "range",
@@ -218,7 +232,8 @@ var tokens = [...]string{
 
 	SELECT: "select",
 	STRUCT: "struct",
-	SWITCH: "switch",
+	SWITCH: "switch", 
+	SLICEOF: "sliceof", 
 	TYPE:   "type",
 	VAR:    "var",
 }
@@ -258,15 +273,15 @@ const (
 //
 func (op Token) Precedence() int {
 	switch op {
-	case LOR:
+	case LOR, TOR:
 		return 1
-	case LAND:
+	case LAND, TAND:
 		return 2
 	case EQL, NEQ, LSS, LEQ, GTR, GEQ:
 		return 3
-	case ADD, SUB, OR, XOR:
+	case ADD, SUB, ORop, XOR:
 		return 4
-	case MUL, QUO, REM, SHL, SHR, AND, AND_NOT:
+	case MUL, QUO, REM, SHL, SHR, ANDop, AND_NOT:
 		return 5
 	}
 	return LowestPrec

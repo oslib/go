@@ -1443,7 +1443,7 @@ func (t *rtype) Implements(u Type) bool {
 	if u.Kind() != Interface {
 		panic("reflect: non-interface type passed to Type.Implements")
 	}
-	return implements(u.(*rtype), t)
+	return chk_implements(u.(*rtype), t)
 }
 
 func (t *rtype) AssignableTo(u Type) bool {
@@ -1451,7 +1451,7 @@ func (t *rtype) AssignableTo(u Type) bool {
 		panic("reflect: nil type passed to Type.AssignableTo")
 	}
 	uu := u.(*rtype)
-	return directlyAssignable(uu, t) || implements(uu, t)
+	return directlyAssignable(uu, t) || chk_implements(uu, t)
 }
 
 func (t *rtype) ConvertibleTo(u Type) bool {
@@ -1467,7 +1467,7 @@ func (t *rtype) Comparable() bool {
 }
 
 // implements reports whether the type V implements the interface type T.
-func implements(T, V *rtype) bool {
+func chk_implements(T, V *rtype) bool {
 	if T.Kind() != Interface {
 		return false
 	}

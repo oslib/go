@@ -20,11 +20,17 @@ import (
 	"cmd/internal/src"
 )
 
+
+var classes map[ string ] bool  
+
 // parseFiles concurrently parses files into *syntax.File structures.
 // Each declaration in every *syntax.File is converted to a syntax tree
 // and its root represented by *Node is appended to xtop.
 // Returns the total count of parsed lines.
-func parseFiles(filenames []string) uint {
+func parseFiles(filenames []string) uint { 
+
+	classes = make( map[string]bool ) 
+
 	var noders []*noder
 	// Limit the number of simultaneously open files.
 	sem := make(chan struct{}, runtime.GOMAXPROCS(0)+10)
@@ -54,12 +60,33 @@ func parseFiles(filenames []string) uint {
 	}
 
 	var lines uint
-	for _, p := range noders {
-		for e := range p.err {
-			p.yyerrorpos(e.Pos, "%s", e.Msg)
-		}
 
-		p.node()
+	for _, p := range noders { // Wait for all the parsers to complete 
+		for e := range p.err { // Should I defer these outputs??? 
+ 			p.yyerrorpos(e.Pos, "%s", e.Msg)
+		}
+		if nsyntaxerrors != 0 { 
+			errorexit() 
+		}
+	}
+
+	for _, p := range noders { 
+		for _, decl := range p.file.DeclList { 
+			switch decl := decl.(type) { 
+			case *syntax.TypeDecl: 
+				cltype, ok := decl.Type.( *syntax.ClassType ) 
+				if ok && cltype != nil { 
+					classes[ cltype.Name ] = true
+				}
+			} 
+		}
+	}
+
+	for _, p := range noders {
+//		for e := range p.err {
+//			p.yyerrorpos(e.Pos, "%s", e.Msg)
+//		}
+		p.node() 
 		lines += p.file.Lines
 		p.file = nil // release memory
 
@@ -283,8 +310,21 @@ func (p *noder) decls(decls []syntax.Decl) (l []*Node) {
 		case *syntax.ConstDecl:
 			l = append(l, p.constDecl(decl, &cs)...)
 
-		case *syntax.TypeDecl:
-			l = append(l, p.typeDecl(decl))
+		case *syntax.TypeDecl: 
+//if debugflag { fmt.Println(" decls*syntax.TypeDecl name=", decl.Name.Value ) }
+			cltype, ok := decl.Type.( *syntax.ClassType ) 
+			if ok && cltype != nil { 
+//fmt.Println( "Handling class type split..." ) 
+				idecl := new( syntax.TypeDecl )  
+				*idecl = *decl 
+				decl.Type = &cltype.S
+				idecl.Type = &cltype.I 
+				idecl.Name = new( syntax.Name ) 
+				*idecl.Name = *decl.Name  
+				decl.Name.Value = decl.Name.Value + syntax.ClassSuffix 
+	 
+				l = append( l, p.typeDecl( decl ), p.typeDecl( idecl ) ) 
+			} else { l = append(l, p.typeDecl(decl)) } 
 
 		case *syntax.FuncDecl:
 			l = append(l, p.funcDecl(decl))
@@ -451,7 +491,26 @@ func (p *noder) declName(name *syntax.Name) *Node {
 	return n
 }
 
+
 func (p *noder) funcDecl(fun *syntax.FuncDecl) *Node {
+
+	if fun.Recv != nil && fun.Recv.Type != nil { // This is a method  
+		var nt syntax.NamedType  
+		nt.NamedType( fun.Recv.Type )
+
+//if debugflag { fmt.Printf( "funcDecl with Receiver nt=%s=  len=%d\n", nt.FullName(), len(nt.FullName()) ) } 
+
+		if classes[ nt.FullName() ] { 
+//			fmt.Println( "This is a class" ) 
+
+			if nt.IsPtr { 
+				p.setlineno( fun.Recv.Type ) 
+	 		    yyerror( "invalid reference receiver for class %s (class type is reference by default)", nt.Fmt() )
+			} 
+			fun.Recv.Type = syntax.MakeClassReceiver( fun.Recv.Type ) 
+		}
+	}
+
 	name := p.name(fun.Name)
 	t := p.signature(fun.Recv, fun.Type)
 	f := p.nod(fun, ODCLFUNC, nil, nil)
@@ -570,20 +629,21 @@ func (p *noder) param(param *syntax.Field, dddOk, final bool) *Node {
 
 func (p *noder) exprList(expr syntax.Expr) []*Node {
 	if list, ok := expr.(*syntax.ListExpr); ok {
-		return p.exprs(list.ElemList)
+		return p.makeExprs(list.ElemList)
 	}
-	return []*Node{p.expr(expr)}
+	return []*Node{p.makeExpr(expr)}
 }
 
-func (p *noder) exprs(exprs []syntax.Expr) []*Node {
+func (p *noder) makeExprs(exprs []syntax.Expr) []*Node {
 	var nodes []*Node
 	for _, expr := range exprs {
-		nodes = append(nodes, p.expr(expr))
+		nodes = append(nodes, p.makeExpr(expr))
 	}
 	return nodes
 }
 
-func (p *noder) expr(expr syntax.Expr) *Node {
+
+func (p *noder) makeExpr(expr syntax.Expr) *Node { 
 	p.setlineno(expr)
 	switch expr := expr.(type) {
 	case nil, *syntax.BadExpr:
@@ -595,9 +655,9 @@ func (p *noder) expr(expr syntax.Expr) *Node {
 	case *syntax.CompositeLit:
 		n := p.nod(expr, OCOMPLIT, nil, nil)
 		if expr.Type != nil {
-			n.Right = p.expr(expr.Type)
+			n.Right = p.makeExpr(expr.Type)
 		}
-		l := p.exprs(expr.ElemList)
+		l := p.makeExprs(expr.ElemList)
 		for i, e := range l {
 			l[i] = p.wrapname(expr.ElemList[i], e)
 		}
@@ -606,14 +666,14 @@ func (p *noder) expr(expr syntax.Expr) *Node {
 		return n
 	case *syntax.KeyValueExpr:
 		// use position of expr.Key rather than of expr (which has position of ':')
-		return p.nod(expr.Key, OKEY, p.expr(expr.Key), p.wrapname(expr.Value, p.expr(expr.Value)))
+		return p.nod(expr.Key, OKEY, p.makeExpr(expr.Key), p.wrapname(expr.Value, p.makeExpr(expr.Value)))
 	case *syntax.FuncLit:
 		return p.funcLit(expr)
 	case *syntax.ParenExpr:
-		return p.nod(expr, OPAREN, p.expr(expr.X), nil)
+		return p.nod(expr, OPAREN, p.makeExpr(expr.X), nil)
 	case *syntax.SelectorExpr:
 		// parser.new_dotname
-		obj := p.expr(expr.X)
+		obj := p.makeExpr(expr.X)
 		if obj.Op == OPACK {
 			obj.Name.SetUsed(true)
 			return oldname(restrictlookup(expr.Sel.Value, obj.Name.Pkg))
@@ -622,28 +682,28 @@ func (p *noder) expr(expr syntax.Expr) *Node {
 		n.Pos = p.pos(expr) // lineno may have been changed by p.expr(expr.X)
 		return n
 	case *syntax.IndexExpr:
-		return p.nod(expr, OINDEX, p.expr(expr.X), p.expr(expr.Index))
+		return p.nod(expr, OINDEX, p.makeExpr(expr.X), p.makeExpr(expr.Index))
 	case *syntax.SliceExpr:
 		op := OSLICE
 		if expr.Full {
 			op = OSLICE3
 		}
-		n := p.nod(expr, op, p.expr(expr.X), nil)
+		n := p.nod(expr, op, p.makeExpr(expr.X), nil)
 		var index [3]*Node
 		for i, x := range expr.Index {
 			if x != nil {
-				index[i] = p.expr(x)
+				index[i] = p.makeExpr(x)
 			}
 		}
 		n.SetSliceBounds(index[0], index[1], index[2])
 		return n
 	case *syntax.AssertExpr:
-		return p.nod(expr, ODOTTYPE, p.expr(expr.X), p.typeExpr(expr.Type))
+		return p.nod(expr, ODOTTYPE, p.makeExpr(expr.X), p.typeExpr(expr.Type))
 	case *syntax.Operation:
 		if expr.Op == syntax.Add && expr.Y != nil {
 			return p.sum(expr)
 		}
-		x := p.expr(expr.X)
+		x := p.makeExpr(expr.X)
 		if expr.Y == nil {
 			if expr.Op == syntax.And {
 				x = unparen(x) // TODO(mdempsky): Needed?
@@ -656,17 +716,18 @@ func (p *noder) expr(expr syntax.Expr) *Node {
 			}
 			return p.nod(expr, p.unOp(expr.Op), x, nil)
 		}
-		return p.nod(expr, p.binOp(expr.Op), x, p.expr(expr.Y))
-	case *syntax.CallExpr:
-		n := p.nod(expr, OCALL, p.expr(expr.Fun), nil)
-		n.List.Set(p.exprs(expr.ArgList))
+		return p.nod(expr, p.binOp(expr.Op), x, p.makeExpr(expr.Y))
+	case *syntax.CallExpr: 
+		fnode := p.makeExpr( expr.Fun ) 
+		n := p.nod(expr, OCALL, fnode, nil)
+		n.List.Set(p.makeExprs(expr.ArgList))
 		n.SetIsDDD(expr.HasDots)
 		return n
 
 	case *syntax.ArrayType:
 		var len *Node
 		if expr.Len != nil {
-			len = p.expr(expr.Len)
+			len = p.makeExpr(expr.Len)
 		} else {
 			len = p.nod(expr, ODDD, nil, nil)
 		}
@@ -679,6 +740,10 @@ func (p *noder) expr(expr syntax.Expr) *Node {
 		return p.structType(expr)
 	case *syntax.InterfaceType:
 		return p.interfaceType(expr)
+	case *syntax.ClassType: 
+		n := p.nod( expr, OTINTER, nil, nil )  
+		yyerror( "unexpected class type", n ) 
+		return n  	
 	case *syntax.FuncType:
 		return p.signature(nil, expr)
 	case *syntax.MapType:
@@ -689,7 +754,7 @@ func (p *noder) expr(expr syntax.Expr) *Node {
 		return n
 
 	case *syntax.TypeSwitchGuard:
-		n := p.nod(expr, OTYPESW, nil, p.expr(expr.X))
+		n := p.nod(expr, OTYPESW, nil, p.makeExpr(expr.X))
 		if expr.Lhs != nil {
 			n.Left = p.declName(expr.Lhs)
 			if n.Left.isBlank() {
@@ -742,7 +807,7 @@ func (p *noder) sum(x syntax.Expr) *Node {
 	var nstr *Node
 	chunks := make([]string, 0, 1)
 
-	n := p.expr(x)
+	n := p.makeExpr(x)
 	if Isconst(n, CTSTR) && n.Sym == nil {
 		nstr = n
 		chunks = append(chunks, nstr.Val().U.(string))
@@ -751,7 +816,7 @@ func (p *noder) sum(x syntax.Expr) *Node {
 	for i := len(adds) - 1; i >= 0; i-- {
 		add := adds[i]
 
-		r := p.expr(add.Y)
+		r := p.makeExpr(add.Y)
 		if Isconst(r, CTSTR) && r.Sym == nil {
 			if nstr != nil {
 				// Collapse r into nstr instead of adding to n.
@@ -779,12 +844,12 @@ func (p *noder) sum(x syntax.Expr) *Node {
 
 func (p *noder) typeExpr(typ syntax.Expr) *Node {
 	// TODO(mdempsky): Be stricter? typecheck should handle errors anyway.
-	return p.expr(typ)
+	return p.makeExpr(typ)
 }
 
 func (p *noder) typeExprOrNil(typ syntax.Expr) *Node {
 	if typ != nil {
-		return p.expr(typ)
+		return p.makeExpr(typ)
 	}
 	return nil
 }
@@ -819,7 +884,12 @@ func (p *noder) structType(expr *syntax.StructType) *Node {
 
 	p.setlineno(expr)
 	n := p.nod(expr, OTSTRUCT, nil, nil)
-	n.List.Set(l)
+	n.List.Set(l) 
+	
+	n.IsClass = expr.IsClass 
+	n.SynNode = expr
+	n.MyNoder = p  
+	
 	return n
 }
 
@@ -842,6 +912,10 @@ func (p *noder) interfaceType(expr *syntax.InterfaceType) *Node {
 
 	n := p.nod(expr, OTINTER, nil, nil)
 	n.List.Set(l)
+	n.IsClass = expr.IsClass 
+		
+//	n.SynNode = expr 
+//	n.MyNoder = p 
 	return n
 }
 
@@ -929,14 +1003,14 @@ func (p *noder) stmtFall(stmt syntax.Stmt, fallOK bool) *Node {
 		}
 		return liststmt(l)
 	case *syntax.ExprStmt:
-		return p.wrapname(stmt, p.expr(stmt.X))
+		return p.wrapname(stmt, p.makeExpr(stmt.X))
 	case *syntax.SendStmt:
-		return p.nod(stmt, OSEND, p.expr(stmt.Chan), p.expr(stmt.Value))
+		return p.nod(stmt, OSEND, p.makeExpr(stmt.Chan), p.makeExpr(stmt.Value))
 	case *syntax.DeclStmt:
 		return liststmt(p.decls(stmt.DeclList))
 	case *syntax.AssignStmt:
 		if stmt.Op != 0 && stmt.Op != syntax.Def {
-			n := p.nod(stmt, OASOP, p.expr(stmt.Lhs), p.expr(stmt.Rhs))
+			n := p.nod(stmt, OASOP, p.makeExpr(stmt.Lhs), p.makeExpr(stmt.Rhs))
 			n.SetImplicit(stmt.Rhs == syntax.ImplicitOne)
 			n.SetSubOp(p.binOp(stmt.Op))
 			return n
@@ -990,7 +1064,7 @@ func (p *noder) stmtFall(stmt syntax.Stmt, fallOK bool) *Node {
 		default:
 			panic("unhandled CallStmt")
 		}
-		return p.nod(stmt, op, p.expr(stmt.Call), nil)
+		return p.nod(stmt, op, p.makeExpr(stmt.Call), nil)
 	case *syntax.ReturnStmt:
 		var results []*Node
 		if stmt.Results != nil {
@@ -1048,7 +1122,7 @@ func (p *noder) assignList(expr syntax.Expr, defn *Node, colas bool) []*Node {
 
 		name, ok := expr.(*syntax.Name)
 		if !ok {
-			p.yyerrorpos(expr.Pos(), "non-name %v on left side of :=", p.expr(expr))
+			p.yyerrorpos(expr.Pos(), "non-name %v on left side of :=", p.makeExpr(expr))
 			newOrErr = true
 			continue
 		}
@@ -1098,7 +1172,7 @@ func (p *noder) ifStmt(stmt *syntax.IfStmt) *Node {
 		n.Ninit.Set1(p.stmt(stmt.Init))
 	}
 	if stmt.Cond != nil {
-		n.Left = p.expr(stmt.Cond)
+		n.Left = p.makeExpr(stmt.Cond)
 	}
 	n.Nbody.Set(p.blockStmt(stmt.Then))
 	if stmt.Else != nil {
@@ -1121,7 +1195,7 @@ func (p *noder) forStmt(stmt *syntax.ForStmt) *Node {
 			panic("unexpected RangeClause")
 		}
 
-		n = p.nod(r, ORANGE, nil, p.expr(r.X))
+		n = p.nod(r, ORANGE, nil, p.makeExpr(r.X))
 		if r.Lhs != nil {
 			n.List.Set(p.assignList(r.Lhs, n, r.Def))
 		}
@@ -1131,7 +1205,7 @@ func (p *noder) forStmt(stmt *syntax.ForStmt) *Node {
 			n.Ninit.Set1(p.stmt(stmt.Init))
 		}
 		if stmt.Cond != nil {
-			n.Left = p.expr(stmt.Cond)
+			n.Left = p.makeExpr(stmt.Cond)
 		}
 		if stmt.Post != nil {
 			n.Right = p.stmt(stmt.Post)
@@ -1149,7 +1223,7 @@ func (p *noder) switchStmt(stmt *syntax.SwitchStmt) *Node {
 		n.Ninit.Set1(p.stmt(stmt.Init))
 	}
 	if stmt.Tag != nil {
-		n.Left = p.expr(stmt.Tag)
+		n.Left = p.makeExpr(stmt.Tag)
 	}
 
 	tswitch := n.Left

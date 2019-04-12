@@ -564,7 +564,7 @@ func typecheck1(cfg *TypeConfig, f interface{}, typeof map[interface{}]string, a
 		case *ast.UnaryExpr:
 			// &x for x of type T has type *T.
 			t := typeof[n.X]
-			if t != "" && n.Op == token.AND {
+			if t != "" && n.Op == token.ANDop {
 				typeof[n] = "*" + t
 			}
 

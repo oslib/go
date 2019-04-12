@@ -84,7 +84,7 @@ func checkAtomicAddAssignment(pass *analysis.Pass, left ast.Expr, call *ast.Call
 
 	gofmt := func(e ast.Expr) string { return analysisutil.Format(pass.Fset, e) }
 
-	if uarg, ok := arg.(*ast.UnaryExpr); ok && uarg.Op == token.AND {
+	if uarg, ok := arg.(*ast.UnaryExpr); ok && uarg.Op == token.ANDop {
 		broken = gofmt(left) == gofmt(uarg.X)
 	} else if star, ok := left.(*ast.StarExpr); ok {
 		broken = gofmt(star.X) == gofmt(arg)

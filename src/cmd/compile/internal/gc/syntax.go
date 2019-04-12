@@ -57,8 +57,182 @@ type Node struct {
 	Esc uint16 // EscXXX
 
 	Op  Op
-	aux uint8
+	aux uint8 
+    
+	SynNode syntax.Node 
+	MyNoder *noder 
+	IsClass bool  
+//    ImpList []*ImpDecl 
+    DumpCode int 
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+
+//func ( n * Node ) SetSNode( sn syntax.Node ) { 
+//    n.SNode = sn 
+//} 
+
+//func ( n *Node ) Fmt() string { 
+//	if n == nil { return "nil" } 
+//	s := Sprintf( "%v", n.Op ) 
+//	return s 
+//} 
+
+
+//func FmtOp( n *Node ) string { 
+//	if n == nil { 
+//		return "nil" 
+//	}
+//	return Sprintf( "%v", n.Op ) 
+//}
+
+//func FmtSym( s *types.Sym ) string { 
+//    if s == nil { 
+//		return "Sym=nil" 
+//	} 
+//	return Sprintf("Sym=%s", s.Name ) 
+//}
+
+
+
+//func FmtType(t *types.Type ) string { 
+//	if t == nil { 
+//		return "Type=nil"
+//	}
+//	return Sprintf("Type=(%s)", FmtSym(t.Sym) ) 
+//} 
+
+//func FmtName( n *Name ) string { 
+//	if n == nil {
+//	    return "Name=nil" 
+//	}
+//	return Sprintf( "Name=%v", n ) 
+//}
+
+
+
+type MethodKey struct { 
+	PkgName string 
+	RecvName string 
+	FuncName string 
+} 
+
+type MethodDesc struct { 
+	IsMethod bool 
+	IsRecvInterface bool 
+	IsRecvPtr bool 
+	mk MethodKey
+} 
+
+
+func (mk *MethodKey ) Fmt() string { 
+	s := mk.PkgName  
+	if len(mk.RecvName) > 0 { 
+		if len(s) > 0 { s += "." }
+		s += mk.RecvName 
+	} 
+	if len(mk.FuncName) > 0 { 
+		if len(s) > 0 { s += "." } 
+		s += mk.FuncName 
+	} 
+	return s
+} 
+
+
+func (n *Node) MethodDesc( md *MethodDesc) { 
+	md.IsMethod = false 
+	md.IsRecvPtr = false 
+	md.IsRecvInterface = false 
+	md.mk.PkgName = "" 
+	md.mk.RecvName = "" 
+	md.mk.FuncName = ""
+	if n == nil { return }	
+
+	if n.Op !=  ODCLFUNC { return } 
+	if n.Func == nil { return } 
+	if n.Func.Shortname == nil { return } 
+	md.mk.FuncName = n.Func.Shortname.Name   
+
+	if n.Func.Nname == nil { return } 
+	ft := n.Func.Nname.Type 
+	if ft == nil { return } 
+	rcvr := ft.Recv() 
+	if rcvr == nil { return } 
+	rt := rcvr.Type  
+	if rt == nil { return }
+	md.IsMethod = true 
+
+	if rt.IsPtr() {  
+		md.IsRecvPtr = true 
+		if rt.Sym != nil { return }
+		rt = rt.Elem() 
+	} 
+	
+	if rt == nil { return } 
+	if rt.Sym == nil { return } 
+	md.mk.RecvName = rt.Sym.Name 
+
+	if rt.IsInterface() { 
+		md.IsRecvInterface = true 
+	}
+}
+
+  
+
+
+/*
+func (n *Node ) DumpNodeTree( prefix string, code int, lvl int ) { 
+	if n == nil { return } 
+	if n.DumpCode == code { return } 
+	n.DumpCode = code 
+
+	s := strings.Repeat( "      ", lvl ) + prefix + FmtOp( n ) 
+	s += "  " + FmtSym( n.Sym ) 
+	s += "  " + FmtType( n.Type ) 
+//	s += "  " + FmtName( n.Name ) 
+	s += "  Func=" + n.funcname()   
+	s += "  Left=" + FmtOp( n.Left ) 
+	s += "  Right=" + FmtOp( n.Right ) 	
+	s += "  Orig=" + FmtOp( n.Orig ) 
+	s += "  Ninit=" + Itoa( n.Ninit.Len() ) 
+	s += "  Nbody=" + Itoa( n.Nbody.Len() ) 
+	s += "  List=" + Itoa( n.List.Len() ) 
+	s += "  RList=" + Itoa( n.Rlist.Len() ) 
+	Println( s )       
+   
+	lvl++ 
+	if n.Left != nil { n.Left.DumpNodeTree( "Left:", code, lvl ) } 
+	if n.Right != nil { n.Right.DumpNodeTree( "Rght:", code, lvl ) } 
+	if n.Orig != nil { n.Orig.DumpNodeTree( "Orig:", code, lvl ) } 
+	for _, nn := range n.Ninit.Slice() { 
+		nn.DumpNodeTree( "Init:", code, lvl ) 	
+	} 
+	for _, nn := range n.Nbody.Slice() { 
+		nn.DumpNodeTree( "Body:", code, lvl ) 
+	}
+	for _, nn := range n.List.Slice() { 
+		nn.DumpNodeTree( "List", code, lvl )
+	}
+	for _, nn := range n.Rlist.Slice() { 
+		nn.DumpNodeTree( "Rlst:", code, lvl )
+	}
+
+}     
+
+
+func DumpXTop() {  
+	if len(xtop) == 0 { return } 
+	Println( "Dumping xtop Count=", len(xtop) )  
+	code := xtop[0].DumpCode + 1
+	for _, xt := range xtop { 
+		xt.DumpNodeTree( "Node:", code, 0 )    
+	}
+} 
+*/
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////
 
 func (n *Node) ResetAux() {
 	n.aux = 0

@@ -753,7 +753,7 @@ func (w *HTMLWriter) WriteAST(phase string, buf *bytes.Buffer) {
 
 // WriteColumn writes raw HTML in a column headed by title.
 // It is intended for pre- and post-compilation log output.
-func (w *HTMLWriter) WriteColumn(phase, title, class, html string) {
+func (w *HTMLWriter) WriteColumn(phase, title, hclass, html string) {
 	if w == nil {
 		return
 	}
@@ -761,10 +761,10 @@ func (w *HTMLWriter) WriteColumn(phase, title, class, html string) {
 	// collapsed column
 	w.Printf("<td id=\"%v-col\" class=\"collapsed\"><div>%v</div></td>", id, phase)
 
-	if class == "" {
+	if hclass == "" {
 		w.Printf("<td id=\"%v-exp\">", id)
 	} else {
-		w.Printf("<td id=\"%v-exp\" class=\"%v\">", id, class)
+		w.Printf("<td id=\"%v-exp\" class=\"%v\">", id, hclass)
 	}
 	w.WriteString("<h2>" + title + "</h2>")
 	w.WriteString(html)

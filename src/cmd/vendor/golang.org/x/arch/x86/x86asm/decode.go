@@ -1449,7 +1449,7 @@ Decode:
 	if lockIndex >= 0 && inst.Prefix[lockIndex]&PrefixImplicit == 0 {
 		switch inst.Op {
 		// TODO(rsc): Perhaps this instruction class should be derived from the CSV.
-		case ADD, ADC, AND, BTC, BTR, BTS, CMPXCHG, CMPXCHG8B, CMPXCHG16B, DEC, INC, NEG, NOT, OR, SBB, SUB, XOR, XADD, XCHG:
+		case ADD, ADC, ANDop, BTC, BTR, BTS, CMPXCHG, CMPXCHG8B, CMPXCHG16B, DEC, INC, NEG, NOTop, ORop, SBB, SUB, XOR, XADD, XCHG:
 			if isMem(inst.Args[0]) {
 				hasLock = true
 				break

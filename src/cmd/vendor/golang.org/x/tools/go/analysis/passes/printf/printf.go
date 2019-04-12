@@ -182,7 +182,7 @@ func findPrintfLike(pass *analysis.Pass) (interface{}, error) {
 					}
 				}
 			}
-			if un, ok := n.(*ast.UnaryExpr); ok && un.Op == token.AND {
+			if un, ok := n.(*ast.UnaryExpr); ok && un.Op == token.ANDop {
 				if match(pass.TypesInfo, un.X, w.format) ||
 					match(pass.TypesInfo, un.X, w.args) {
 					// Taking the address of the
@@ -852,7 +852,7 @@ func recursiveStringer(pass *analysis.Pass, e ast.Expr) bool {
 	if recv == nil {
 		return false
 	}
-	if u, ok := e.(*ast.UnaryExpr); ok && u.Op == token.AND {
+	if u, ok := e.(*ast.UnaryExpr); ok && u.Op == token.ANDop {
 		e = u.X // strip off & from &r
 	}
 	if id, ok := e.(*ast.Ident); ok {

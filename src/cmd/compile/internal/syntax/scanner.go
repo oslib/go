@@ -39,6 +39,7 @@ type scanner struct {
 	kind      LitKind  // valid if tok is _Literal
 	op        Operator // valid if tok is _Operator, _AssignOp, or _IncOp
 	prec      int      // valid if tok is _Operator, _AssignOp, or _IncOp
+	replay []*scannerSpot 
 }
 
 func (s *scanner) init(src io.Reader, errh func(line, col uint, msg string), mode uint) {
@@ -46,6 +47,52 @@ func (s *scanner) init(src io.Reader, errh func(line, col uint, msg string), mod
 	s.mode = mode
 	s.nlsemi = false
 }
+
+
+type scannerSpot struct { 
+	line, col uint
+	tok       token
+	lit       string   // valid if tok is _Name, _Literal, or _Semi ("semicolon", "newline", or "EOF")
+	kind      LitKind  // valid if tok is _Literal
+	op        Operator // valid if tok is _Operator, _AssignOp, or _IncOp
+	prec      int      // valid if tok is _Operator, _AssignOp, or _IncOp
+} 
+
+
+func (s *scanner) addSave() { 
+    sv := new( scannerSpot ) 
+    sv.line = s.line  
+    sv.col = s.col 
+    sv.tok = s.tok 
+    sv.lit = s.lit 
+    sv.kind = s.kind 
+    sv.op = s.op 
+    sv.prec = s.prec 
+    s.replay = append( s.replay, sv ) 
+} 
+
+
+func (s *scanner) restoreSave() { 
+    if len(s.replay) > 0 { 
+        sv := s.replay[ 0 ] 
+        s.replay[ 0 ] = nil 
+        copy( s.replay, s.replay[1:] )
+        s.replay = s.replay[:len(s.replay) - 1]
+        s.line = sv.line  
+        s.col = sv.col 
+        s.tok = sv.tok 
+        s.lit = sv.lit 
+        s.kind = sv.kind 
+        s.op = sv.op 
+        s.prec = sv.prec 
+    }     
+}
+
+
+func (s* scanner) clearSave() { 
+    s.replay = nil 
+}
+ 
 
 // next advances the scanner by reading the next token.
 //
@@ -67,7 +114,18 @@ func (s *scanner) init(src io.Reader, errh func(line, col uint, msg string), mod
 // //-style comments are only recognized if they are at the beginning
 // of a line.
 //
-func (s *scanner) next() {
+
+
+func (s *scanner ) next() { 
+    if len(s.replay) == 0 { 
+        s.nextDirect() 
+        return 
+    }
+    s.restoreSave() 
+}
+     
+
+func (s *scanner) nextDirect() {
 	nlsemi := s.nlsemi
 	s.nlsemi = false
 
@@ -347,7 +405,24 @@ func (s *scanner) ident() {
 	lit := s.stopLit()
 
 	// possibly a keyword
-	if len(lit) >= 2 {
+	if len(lit) >= 2 { 
+		// Or, check for special logical operators  
+		if string(lit) == "AND" { 
+			s.op, s.prec = AndAnd, precAndAnd
+			s.tok = _Operator 
+			return 
+		} 
+		if string(lit) == "OR" { 
+			s.op, s.prec = OrOr, precOrOr
+			s.tok = _Operator 
+			return 
+		} 
+		if string(lit) == "NOT" { 
+			s.op, s.prec = Not, 0
+			s.tok = _Operator
+			return 
+		}
+		// Check for keyword 
 		if tok := keywordMap[hash(lit)]; tok != 0 && tokStrFast(tok) == string(lit) {
 			s.nlsemi = contains(1<<_Break|1<<_Continue|1<<_Fallthrough|1<<_Return, tok)
 			s.tok = tok
@@ -385,7 +460,12 @@ func (s *scanner) isIdentRune(c rune, first bool) bool {
 // hash is a perfect hash function for keywords.
 // It assumes that s has at least length 2.
 func hash(s []byte) uint {
-	return (uint(s[0])<<4 ^ uint(s[1]) + uint(len(s))) & uint(len(keywordMap)-1)
+	l := uint( len(s) )   
+	h := ( ( uint(s[0]) << 4 ) ^ uint(s[1]) + l )  
+	if l == 10 { h++ } 
+	if (l == 7) && (s[0] == 's') { h-- }  
+	if s[0] == 'c' && s[1] == 'l' { h += 4 } 
+	return h & uint(len(keywordMap)-1)  
 }
 
 var keywordMap [1 << 6]token // size must be power of two

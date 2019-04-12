@@ -205,13 +205,13 @@ const (
 	ORIS
 	XORI
 	XORIS
-	AND
+	ANDop
 	ANDCC
 	XOR
 	XORCC
 	NAND
 	NANDCC
-	OR
+	ORop
 	ORCC
 	NOR
 	NORCC
@@ -1547,13 +1547,13 @@ var opstr = [...]string{
 	ORIS:          "oris",
 	XORI:          "xori",
 	XORIS:         "xoris",
-	AND:           "and",
+	ANDop:           "and",
 	ANDCC:         "and.",
 	XOR:           "xor",
 	XORCC:         "xor.",
 	NAND:          "nand",
 	NANDCC:        "nand.",
-	OR:            "or",
+	ORop:            "or",
 	ORCC:          "or.",
 	NOR:           "nor",
 	NORCC:         "nor.",
@@ -3163,7 +3163,7 @@ var instFormats = [...]instFormat{
 		[5]*argField{ap_Reg_11_15, ap_Reg_6_10, ap_ImmUnsigned_16_31}},
 	{XORIS, 0xfc000000, 0x6c000000, 0x0, // XOR Immediate Shifted D-form (xoris RA,RS,UI)
 		[5]*argField{ap_Reg_11_15, ap_Reg_6_10, ap_ImmUnsigned_16_31}},
-	{AND, 0xfc0007ff, 0x7c000038, 0x0, // AND X-form (and RA,RS,RB)
+	{ANDop, 0xfc0007ff, 0x7c000038, 0x0, // AND X-form (and RA,RS,RB)
 		[5]*argField{ap_Reg_11_15, ap_Reg_6_10, ap_Reg_16_20}},
 	{ANDCC, 0xfc0007ff, 0x7c000039, 0x0, // AND X-form (and. RA,RS,RB)
 		[5]*argField{ap_Reg_11_15, ap_Reg_6_10, ap_Reg_16_20}},
@@ -3175,7 +3175,7 @@ var instFormats = [...]instFormat{
 		[5]*argField{ap_Reg_11_15, ap_Reg_6_10, ap_Reg_16_20}},
 	{NANDCC, 0xfc0007ff, 0x7c0003b9, 0x0, // NAND X-form (nand. RA,RS,RB)
 		[5]*argField{ap_Reg_11_15, ap_Reg_6_10, ap_Reg_16_20}},
-	{OR, 0xfc0007ff, 0x7c000378, 0x0, // OR X-form (or RA,RS,RB)
+	{ORop, 0xfc0007ff, 0x7c000378, 0x0, // OR X-form (or RA,RS,RB)
 		[5]*argField{ap_Reg_11_15, ap_Reg_6_10, ap_Reg_16_20}},
 	{ORCC, 0xfc0007ff, 0x7c000379, 0x0, // OR X-form (or. RA,RS,RB)
 		[5]*argField{ap_Reg_11_15, ap_Reg_6_10, ap_Reg_16_20}},

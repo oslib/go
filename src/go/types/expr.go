@@ -62,7 +62,7 @@ var unaryOpPredicates = opPredicates{
 	token.ADD: isNumeric,
 	token.SUB: isNumeric,
 	token.XOR: isInteger,
-	token.NOT: isBoolean,
+	token.NOTop: isBoolean,
 }
 
 func (check *Checker) op(m opPredicates, x *operand, op token.Token) bool {
@@ -81,7 +81,7 @@ func (check *Checker) op(m opPredicates, x *operand, op token.Token) bool {
 // The unary expression e may be nil. It's passed in for better error messages only.
 func (check *Checker) unary(x *operand, e *ast.UnaryExpr, op token.Token) {
 	switch op {
-	case token.AND:
+	case token.ANDop:
 		// spec: "As an exception to the addressability
 		// requirement x may also be a composite literal."
 		if _, ok := unparen(x.expr).(*ast.CompositeLit); !ok && x.mode != variable {
@@ -763,8 +763,8 @@ var binaryOpPredicates = opPredicates{
 	token.QUO: isNumeric,
 	token.REM: isInteger,
 
-	token.AND:     isInteger,
-	token.OR:      isInteger,
+	token.ANDop:     isInteger,
+	token.ORop:      isInteger,
 	token.XOR:     isInteger,
 	token.AND_NOT: isInteger,
 

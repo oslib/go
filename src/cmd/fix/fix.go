@@ -417,7 +417,7 @@ func rewriteUses(x *ast.Ident, f, fnot func(token.Pos) ast.Expr, scope []ast.Stm
 		// The child node was just walked and possibly replaced.
 		// If it was replaced and this is a negation, replace with fnot(p).
 		not, ok := nn.(*ast.UnaryExpr)
-		if ok && not.Op == token.NOT && not.X == lastF {
+		if ok && not.Op == token.NOTop && not.X == lastF {
 			*ptr = fnot(nn.Pos())
 			return
 		}
@@ -441,7 +441,7 @@ func assignsTo(x *ast.Ident, scope []ast.Stmt) bool {
 		switch n := n.(type) {
 		case *ast.UnaryExpr:
 			// use of &x
-			if n.Op == token.AND && refersTo(n.X, x) {
+			if n.Op == token.ANDop && refersTo(n.X, x) {
 				assigned = true
 				return
 			}

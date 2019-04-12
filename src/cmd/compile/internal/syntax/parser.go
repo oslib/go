@@ -163,6 +163,27 @@ func (p *parser) got(tok token) bool {
 	return false
 }
 
+func (p *parser) gotElse() ( bool, bool ) { // Allow lookahead across linebreak 
+	if p.tok == _Else {
+		p.next()
+		return true, false 
+	} 
+	if p.tok == _Semi { 
+		p.addSave() 
+		p.nextDirect() 
+		if p.tok == _Else {
+			p.clearSave()  
+			p.next() 
+			return true, true 
+		}
+		p.addSave() 
+		p.next() 
+	} 
+
+	return false, false
+} 
+
+
 func (p *parser) want(tok token) {
 	if !p.got(tok) {
 		p.syntaxError("expecting " + tokstring(tok))
@@ -260,7 +281,8 @@ const stopset uint64 = 1<<_Break |
 	1<<_Continue |
 	1<<_Defer |
 	1<<_Fallthrough |
-	1<<_For |
+	1<<_For | 
+    1<<_While |
 	1<<_Go |
 	1<<_Goto |
 	1<<_If |
@@ -513,7 +535,7 @@ func (p *parser) constDecl(group *Group) Decl {
 
 	d.NameList = p.nameList(p.name())
 	if p.tok != _EOF && p.tok != _Semi && p.tok != _Rparen {
-		d.Type = p.typeOrNil()
+		d.Type = p.typeOrNil( "" )
 		if p.got(_Assign) {
 			d.Values = p.exprList()
 		}
@@ -534,7 +556,7 @@ func (p *parser) typeDecl(group *Group) Decl {
 
 	d.Name = p.name()
 	d.Alias = p.got(_Assign)
-	d.Type = p.typeOrNil()
+	d.Type = p.typeOrNil( d.Name.Value )
 	if d.Type == nil {
 		d.Type = p.bad()
 		p.syntaxError("in type declaration")
@@ -849,7 +871,7 @@ func (p *parser) operand(keep_parens bool) Expr {
 		}
 		return t
 
-	case _Lbrack, _Chan, _Map, _Struct, _Interface:
+	case _Lbrack, _Chan, _Map, _Struct, _Interface, _Sliceof:
 		return p.type_() // othertype
 
 	default:
@@ -1067,7 +1089,7 @@ func (p *parser) type_() Expr {
 		defer p.trace("type_")()
 	}
 
-	typ := p.typeOrNil()
+	typ := p.typeOrNil("")
 	if typ == nil {
 		typ = p.bad()
 		p.syntaxError("expecting type")
@@ -1092,7 +1114,7 @@ func newIndirect(pos Pos, typ Expr) Expr {
 // TypeName = identifier | QualifiedIdent .
 // TypeLit  = ArrayType | StructType | PointerType | FunctionType | InterfaceType |
 // 	      SliceType | MapType | Channel_Type .
-func (p *parser) typeOrNil() Expr {
+func (p *parser) typeOrNil( name string ) Expr {
 	if trace {
 		defer p.trace("typeOrNil")()
 	}
@@ -1119,6 +1141,14 @@ func (p *parser) typeOrNil() Expr {
 		p.next()
 		return p.funcType()
 
+	case _Sliceof: 
+		p.next()  
+		t := new( SliceType ) 
+		t.pos = pos ; 
+		t.Elem = p.type_() 
+		t.isSliceof = true  
+		return t 
+
 	case _Lbrack:
 		// '[' oexpr ']' ntype
 		// '[' _DotDotDot ']' ntype
@@ -1130,6 +1160,7 @@ func (p *parser) typeOrNil() Expr {
 			t := new(SliceType)
 			t.pos = pos
 			t.Elem = p.type_()
+			t.isSliceof = false  
 			return t
 		}
 
@@ -1170,8 +1201,11 @@ func (p *parser) typeOrNil() Expr {
 	case _Struct:
 		return p.structType()
 
-	case _Interface:
-		return p.interfaceType()
+	case _Interface: 
+		return p.interfaceType()  
+
+	case _Class: 
+		return p.classType( name ) 
 
 	case _Name:
 		return p.dotname(p.name())
@@ -1204,7 +1238,7 @@ func (p *parser) chanElem() Expr {
 		defer p.trace("chanElem")()
 	}
 
-	typ := p.typeOrNil()
+	typ := p.typeOrNil("")
 	if typ == nil {
 		typ = p.bad()
 		p.syntaxError("missing channel element type")
@@ -1238,8 +1272,13 @@ func (p *parser) structType() *StructType {
 
 	typ := new(StructType)
 	typ.pos = p.pos()
-
 	p.want(_Struct)
+
+    if p.tok == _Implements { 
+		p.next() 
+		typ.ImpList = p.nameList(p.name())   
+    } 
+
 	p.list(_Lbrace, _Semi, _Rbrace, func() bool {
 		p.fieldDecl(typ)
 		return false
@@ -1268,6 +1307,96 @@ func (p *parser) interfaceType() *InterfaceType {
 	return typ
 }
 
+/////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////
+
+func (p *parser) addMethodOrMember( c *ClassType ) {
+	if trace {
+		defer p.trace("addMethodOrMember")()
+	}
+	pos := p.pos() 
+
+	switch p.tok { 
+	case _Name: 
+		name := p.name() 
+		if p.tok == _Lparen { // Method declaration 
+			f := new(Field)
+			f.pos = name.Pos()
+			f.Name = name
+			f.Type = p.funcType()
+			c.I.MethodList = append( c.I.MethodList, f )
+		} else { 
+			if p.tok == _Dot || p.tok == _Literal || p.tok == _Semi || p.tok == _Rbrace {
+				// embed oliteral
+				typ := p.qualifiedName(name)
+				tag := p.oliteral()
+				p.addField( &c.S, pos, nil, typ, tag)
+				return
+			}
+
+			// new_name_list ntype oliteral
+			names := p.nameList(name)
+			typ := p.type_()
+			tag := p.oliteral()
+			for _, name := range names {
+				p.addField( &c.S, name.Pos(), name, typ, tag )
+			}
+		}
+	default:  
+		p.syntaxError("expecting method or member declaration")
+		p.advance(_Semi, _Rbrace)
+	}
+}
+
+
+
+///////////////////////////////////////////////////////////////////
+func (p *parser) classType( name string ) *ClassType { 
+	if trace {
+		defer p.trace("classType")() 
+	} 
+
+	typ := new(ClassType) 
+	typ.Name = name 
+	typ.I.IsClass = true 
+	typ.S.IsClass = true  
+	typ.pos = p.pos()
+	typ.I.pos = typ.pos 
+ 	typ.S.pos = typ.pos 
+
+	p.want(_Class) 
+
+	for p.tok == _Implements || p.tok == _Extends { 
+		if p.tok == _Implements { 
+			p.next() 
+			typ.S.ImpList = append( typ.S.ImpList, p.nameList(p.name())...)   
+	    } 
+		if p.tok == _Extends { 
+			p.next() 
+			typ.S.ExtList = append( typ.S.ExtList, p.nameList( p.name())...) 		 
+		}
+	} 
+
+	p.list( _Lbrace, _Semi, _Rbrace, func() bool { 
+		p.addMethodOrMember( typ )
+		return false 
+	} )
+
+	for _, imp := range typ.S.ImpList { 
+        typ.InsertImpType( imp ) 
+	}
+	for _, ext := range typ.S.ExtList {
+		typ.InsertImpType( ext ) 
+ 	} 
+
+	return typ 
+} 
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+
 // Result = Parameters | Type .
 func (p *parser) funcResult() []*Field {
 	if trace {
@@ -1279,7 +1408,7 @@ func (p *parser) funcResult() []*Field {
 	}
 
 	pos := p.pos()
-	if typ := p.typeOrNil(); typ != nil {
+	if typ := p.typeOrNil(""); typ != nil {
 		f := new(Field)
 		f.pos = pos
 		f.Type = typ
@@ -1499,7 +1628,7 @@ func (p *parser) dotsType() *DotsType {
 	t.pos = p.pos()
 
 	p.want(_DotDotDot)
-	t.Elem = p.typeOrNil()
+	t.Elem = p.typeOrNil("")
 	if t.Elem == nil {
 		t.Elem = p.bad()
 		p.syntaxError("final argument in variadic function missing type")
@@ -1772,15 +1901,16 @@ func (p *parser) declStmt(f func(*Group) Decl) *DeclStmt {
 	return s
 }
 
-func (p *parser) forStmt() Stmt {
+func (p *parser) forStmt( keyword token ) Stmt {
 	if trace {
 		defer p.trace("forStmt")()
 	}
 
-	s := new(ForStmt)
+	s := new(ForStmt) 
+	s.Tok = keyword 
 	s.pos = p.pos()
 
-	s.Init, s.Cond, s.Post = p.header(_For)
+	s.Init, s.Cond, s.Post = p.header( keyword )
 	s.Body = p.blockStmt("for clause")
 
 	return s
@@ -1788,6 +1918,9 @@ func (p *parser) forStmt() Stmt {
 
 func (p *parser) header(keyword token) (init SimpleStmt, cond Expr, post SimpleStmt) {
 	p.want(keyword)
+	if  keyword == _While { 
+		keyword = _For 
+	} 
 
 	if p.tok == _Lbrace {
 		if keyword == _If {
@@ -1890,7 +2023,10 @@ func (p *parser) ifStmt() *IfStmt {
 	s.Init, s.Cond, _ = p.header(_If)
 	s.Then = p.blockStmt("if clause")
 
-	if p.got(_Else) {
+	foundElse, newLine := p.gotElse() 
+  
+	if foundElse {
+		s.ElseOnNewLine = newLine 
 		switch p.tok {
 		case _If:
 			s.Else = p.ifStmt()
@@ -2063,7 +2199,9 @@ func (p *parser) stmtOrNil() Stmt {
 		return p.simpleStmt(nil, 0)
 
 	case _For:
-		return p.forStmt()
+		return p.forStmt( _For )
+	case _While: 
+		return p.forStmt( _While ) 
 
 	case _Switch:
 		return p.switchStmt()

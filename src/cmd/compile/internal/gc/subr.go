@@ -602,7 +602,7 @@ func assignop(src *types.Type, dst *types.Type, why *string) Op {
 	if dst.IsInterface() && src.Etype != TNIL {
 		var missing, have *types.Field
 		var ptr int
-		if implements(src, dst, &missing, &have, &ptr) {
+		if chk_implements(src, dst, &missing, &have, &ptr) {
 			return OCONVIFACE
 		}
 
@@ -642,7 +642,7 @@ func assignop(src *types.Type, dst *types.Type, why *string) Op {
 	if src.IsInterface() && dst.Etype != TBLANK {
 		var missing, have *types.Field
 		var ptr int
-		if why != nil && implements(dst, src, &missing, &have, &ptr) {
+		if why != nil && chk_implements(dst, src, &missing, &have, &ptr) {
 			*why = ": need type assertion"
 		}
 		return 0
@@ -1659,7 +1659,8 @@ func ifacelookdot(s *types.Sym, t *types.Type, ignorecase bool) (m *types.Field,
 	return m, followptr
 }
 
-func implements(t, iface *types.Type, m, samename **types.Field, ptr *int) bool {
+
+func chk_implements(t, iface *types.Type, missing, samename **types.Field, ptr *int) bool {
 	t0 := t
 	if t == nil {
 		return false
@@ -1673,14 +1674,14 @@ func implements(t, iface *types.Type, m, samename **types.Field, ptr *int) bool 
 				i++
 			}
 			if i == len(tms) {
-				*m = im
+				*missing = im
 				*samename = nil
 				*ptr = 0
 				return false
 			}
 			tm := tms[i]
 			if !types.Identical(tm.Type, im.Type) {
-				*m = im
+				*missing = im
 				*samename = tm
 				*ptr = 0
 				return false
@@ -1705,14 +1706,14 @@ func implements(t, iface *types.Type, m, samename **types.Field, ptr *int) bool 
 			i++
 		}
 		if i == len(tms) {
-			*m = im
+			*missing = im
 			*samename, _ = ifacelookdot(im.Sym, t, true)
 			*ptr = 0
 			return false
 		}
 		tm := tms[i]
 		if tm.Nointerface() || !types.Identical(tm.Type, im.Type) {
-			*m = im
+			*missing = im
 			*samename = tm
 			*ptr = 0
 			return false
@@ -1726,8 +1727,7 @@ func implements(t, iface *types.Type, m, samename **types.Field, ptr *int) bool 
 			if false && Debug['r'] != 0 {
 				yyerror("interface pointer mismatch")
 			}
-
-			*m = im
+			*missing = im
 			*samename = nil
 			*ptr = 1
 			return false
@@ -1744,6 +1744,94 @@ func implements(t, iface *types.Type, m, samename **types.Field, ptr *int) bool 
 	}
 	return true
 }
+
+
+/////////////////////////////////////////////////////////////////////////////////////
+
+type ChkImplement struct { 
+	Name string 
+	Why string 
+} 
+
+type ChkImplements struct { 
+	impOK bool 
+	missing [] ChkImplement 
+}
+
+func ( chk *ChkImplements ) addError( f *types.Field, why string ) { 
+	chk.impOK = false  
+	var ci ChkImplement 
+	ci.Name = f.Sym.Name 
+	ci.Why = why 
+	chk.missing = append( chk.missing, ci ) 
+}        
+
+
+func ( chk *ChkImplements ) ChkStruct( t *types.Type, iface *types.Type ) {
+//	t0 := t
+	chk.missing = nil 
+
+	if t == nil { 
+		chk.impOK = false   
+		return 
+	}
+
+	t = methtype(t)
+	var tms []*types.Field
+	if t != nil {
+		expandmeth(t)
+		tms = t.AllMethods().Slice()
+	}
+
+	chk.impOK = true     
+	i := 0
+	for _, im := range iface.Fields().Slice() {
+		if im.Broke() {
+			continue
+		}
+		for i < len(tms) && tms[i].Sym != im.Sym {
+			i++
+		}
+		if i == len(tms) { 
+			samename, _ := ifacelookdot( im.Sym, t, true )  
+			if samename == im { 
+				chk.addError( im, "different type for" )  
+			} else {
+                 chk.addError( im, "missing" ) 
+			}  
+			i = 0  // Could optimize this a bit - but it is the error case... 
+			continue
+		}
+		tm := tms[i]
+		if tm.Nointerface() || !types.Identical(tm.Type, im.Type) {
+			chk.addError( im, "different type for" ) 
+			continue
+		}
+
+//		followptr := tm.Embedded == 2
+//		// if pointer receiver in method,
+//		// the method does not exist for value types.
+//		rcvr := tm.Type.Recv().Type
+//		if rcvr.IsPtr() && !t0.IsPtr() && !followptr && !isifacemethod(tm.Type) {
+//			chk.addError( im, "cannot be used for value types" )			
+//			continue
+//		}
+	}
+
+	// We're going to emit an OCONVIFACE.
+	// Call itabname so that (t, iface)
+	// gets added to itabs early, which allows
+	// us to de-virtualize calls through this
+	// type/interface pair later. See peekitabs in reflect.go
+//	if isdirectiface(t0) && !iface.IsEmptyInterface() {
+//		itabname(t0, iface)
+//	}
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+
 
 func listtreecopy(l []*Node, pos src.XPos) []*Node {
 	var out []*Node

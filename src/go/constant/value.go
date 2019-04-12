@@ -896,7 +896,7 @@ func UnaryOp(op token.Token, y Value, prec uint) Value {
 		}
 		return makeInt(z)
 
-	case token.NOT:
+	case token.NOTop:
 		switch y := y.(type) {
 		case unknownVal:
 			return y
@@ -1050,9 +1050,9 @@ func BinaryOp(x_ Value, op token.Token, y_ Value) Value {
 			c = a / b
 		case token.REM:
 			c = a % b
-		case token.AND:
+		case token.ANDop:
 			c = a & b
-		case token.OR:
+		case token.ORop:
 			c = a | b
 		case token.XOR:
 			c = a ^ b
@@ -1080,9 +1080,9 @@ func BinaryOp(x_ Value, op token.Token, y_ Value) Value {
 			c.Quo(a, b)
 		case token.REM:
 			c.Rem(a, b)
-		case token.AND:
+		case token.ANDop:
 			c.And(a, b)
-		case token.OR:
+		case token.ORop:
 			c.Or(a, b)
 		case token.XOR:
 			c.Xor(a, b)

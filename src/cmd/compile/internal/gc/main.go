@@ -519,6 +519,11 @@ func Main(archInit func(*Arch)) {
 		}
 	}
 
+	// Phase 1.5 Check struct implements 
+	for i := 0 ; i < len(xtop) ; i++ { 
+		typecheck_implements( xtop[ i ] ) 
+	}
+
 	// Phase 2: Variable assignments.
 	//   To check interface assignments, depends on phase 1.
 

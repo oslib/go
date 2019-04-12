@@ -245,6 +245,7 @@ type importReader struct {
 	currPkg  *types.Pkg
 	prevBase *src.PosBase
 	prevLine int64
+	classIsComing bool 
 }
 
 func (p *iimporter) newReader(off uint64, pkg *types.Pkg) *importReader {
@@ -535,6 +536,10 @@ func (r *importReader) typ1() *types.Type {
 		r.setPkg()
 		return r.signature(nil)
 
+	case classType: 
+		r.classIsComing = true 
+		return r.typ1()  
+
 	case structType:
 		r.setPkg()
 
@@ -560,6 +565,11 @@ func (r *importReader) typ1() *types.Type {
 		t := types.New(TSTRUCT)
 		t.SetPkg(r.currPkg)
 		t.SetFields(fs)
+		if r.classIsComing { 
+			t.Extra.(*types.Struct).IsClass = true 
+			r.classIsComing = false 		
+		} 
+
 		return t
 
 	case interfaceType:
@@ -592,6 +602,11 @@ func (r *importReader) typ1() *types.Type {
 		t := types.New(TINTER)
 		t.SetPkg(r.currPkg)
 		t.SetInterface(append(embeddeds, methods...))
+
+		if r.classIsComing { 
+			t.Extra.(*types.Interface).IsClass = true  
+			r.classIsComing = false 
+		}
 
 		// Ensure we expand the interface in the frontend (#25055).
 		checkwidth(t)

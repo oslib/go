@@ -221,7 +221,8 @@ func (p *printer) writeIndent() {
 	// must not be discarded by the tabwriter
 	n := p.Config.Indent + p.indent // include base indentation
 	for i := 0; i < n; i++ {
-		p.output = append(p.output, '\t')
+		//p.output = append(p.output, '\t') 
+        p.output = append( p.output, "    "... ) 
 	}
 
 	// update positions
@@ -391,8 +392,9 @@ func (p *printer) writeCommentPrefix(pos, next token.Position, prev *ast.Comment
 		}
 		// make sure there is at least one separator
 		if !hasSep {
-			sep := byte('\t')
-			if pos.Line == next.Line {
+			//sep := byte('\t')
+			sep := byte( ' ' )
+            if pos.Line == next.Line {
 				// next item is on the same line as the comment
 				// (which must be a /*-style comment): separate
 				// with a blank instead of a tab
@@ -856,7 +858,7 @@ func mayCombine(prev token.Token, next byte) (b bool) {
 		b = next == '*' // /*
 	case token.LSS:
 		b = next == '-' || next == '<' // <- or <<
-	case token.AND:
+	case token.ANDop:
 		b = next == '&' || next == '^' // && or &^
 	}
 	return

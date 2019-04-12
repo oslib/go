@@ -1140,7 +1140,7 @@ func (p *Package) checkIndex(sb, sbCheck *bytes.Buffer, arg ast.Expr, i int) boo
 		x = c.Args[0]
 	}
 	u, ok := x.(*ast.UnaryExpr)
-	if !ok || u.Op != token.AND {
+	if !ok || u.Op != token.ANDop {
 		return false
 	}
 	index, ok := u.X.(*ast.IndexExpr)
@@ -1189,7 +1189,7 @@ func (p *Package) checkAddr(sb, sbCheck *bytes.Buffer, arg ast.Expr, i int) bool
 		}
 		px = &c.Args[0]
 	}
-	if u, ok := (*px).(*ast.UnaryExpr); !ok || u.Op != token.AND {
+	if u, ok := (*px).(*ast.UnaryExpr); !ok || u.Op != token.ANDop {
 		return false
 	}
 

@@ -6,6 +6,7 @@ package gc
 
 import (
 	"cmd/compile/internal/types"
+	"cmd/compile/internal/syntax" 
 	"cmd/internal/objabi"
 	"fmt"
 	"math"
@@ -546,13 +547,19 @@ func typecheck1(n *Node, top int) (res *Node) {
 			return n
 		}
 		n.List.Set(nil)
-
+		if n.IsClass { 
+			n.Type.Extra.(*types.Struct).IsClass = true 
+		}
+		
 	case OTINTER:
 		ok |= Etype
 		n.Op = OTYPE
 		n.Type = tointerface(n.List.Slice())
 		if n.Type == nil {
 			return n
+		} 
+		if n.IsClass { 
+			n.Type.Extra.(*types.Interface).IsClass = true 
 		}
 
 	case OTFUNC:
@@ -1019,7 +1026,7 @@ func typecheck1(n *Node, top int) (res *Node) {
 		if n.Type != nil && !n.Type.IsInterface() {
 			var missing, have *types.Field
 			var ptr int
-			if !implements(n.Type, t, &missing, &have, &ptr) {
+			if !chk_implements(n.Type, t, &missing, &have, &ptr) {
 				if have != nil && have.Sym == missing.Sym {
 					yyerror("impossible type assertion:\n\t%v does not implement %v (wrong type for %v method)\n"+
 						"\t\thave %v%0S\n\t\twant %v%0S", n.Type, t, missing.Sym, have.Sym, have.Type, missing.Sym, missing.Type)
@@ -1974,6 +1981,24 @@ func typecheck1(n *Node, top int) (res *Node) {
 			return n
 		}
 
+		if t.IsInterface() && t.IsClass() { 
+			if l.Sym != nil { 
+				stsym, ok := l.Sym.Pkg.LookupOK( l.Sym.Name + syntax.ClassSuffix ) 
+				if ok { 
+					tnode := asNode( stsym.Def ) // Major Kludge Monger Mess <<<<---- Right Here 
+					if tnode != nil {  
+						if tnode.Type == nil { 
+							resolve( tnode ) 
+						} 
+						if tnode.Type != nil {  
+							l.Sym = stsym  
+						    t = tnode.Type  
+						}
+					}
+				}
+			} 
+		}
+
 		n.Left = l
 		n.Type = types.NewPtr(t)
 
@@ -2257,6 +2282,84 @@ func typecheck1(n *Node, top int) (res *Node) {
 
 	return n
 }
+
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+func typecheck_implements( n *Node ) {  
+	if n.Op == ODCL { 
+		fmt.Println( "OK Mange, got one" ) 
+
+	} 
+
+	if n.Op != ODCLTYPE { return } 
+    if n.Left == nil { return } 
+    
+	stnode := n.Left 
+    if stnode.Type == nil { return } 
+	if !stnode.Type.IsStruct() { return }  
+
+	if stnode.Name == nil { return } 
+	if stnode.Name.Param == nil { return } 
+	if stnode.Name.Param.Ntype == nil { return } 
+
+	expnode := stnode.Name.Param.Ntype 
+	if expnode.Type == nil { return }     
+	if expnode.MyNoder == nil || expnode.SynNode == nil { return } 
+
+	expr, ok := expnode.SynNode.(*syntax.StructType) 
+	if !ok { return }
+ 
+	sname := "NoName" 
+	if stnode.Sym != nil { 
+		sname = stnode.Sym.Name 
+	} 
+
+	for _, imp := range expr.ImpList { 
+		iname := imp.Value  
+		lineno = expnode.MyNoder.makeXPos( imp.Pos() )  
+//		fmt.Println( "Need to verify interface=", iname ) 
+
+		isym := lookup( iname ) 
+		if isym == nil { 
+	 		fmt.Println( ">>>>>>>>>>>>>>MakeError 0" ) 
+             yyerror( "%s does not implement unknown type %s", sname, iname )
+			continue 			
+		} 	
+
+		inode := asNode( isym.Def ) 
+		if inode == nil { 
+			yyerror( "%s does not implement unknown type %s", sname, iname )
+			continue 
+		} 	
+		if inode.Type == nil { 
+	 		yyerror( "%s does not implement unknown type %s", sname, iname )
+			continue 
+		} 
+		if !inode.Type.IsInterface() { 
+			yyerror( "%s does not implement %s (not an interface)", sname, iname )
+			continue
+		} 	
+
+		var chkImp ChkImplements 
+        chkImp.ChkStruct( stnode.Type, inode.Type ) 
+		if ! chkImp.impOK { 
+			fmt.Println( sname, "does not implement", iname )  
+			for _, mName := range chkImp.missing {               
+	  			yyerror( "%s does not implement %s (%s %s method)", sname, iname, mName.Why, mName.Name ) 
+			}  
+		}   
+    } 
+	expnode.SynNode = nil 
+	expnode.MyNoder = nil 
+} 
+
+
+///////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////
+
 
 func checksliceindex(l *Node, r *Node, tp *types.Type) bool {
 	t := r.Type
@@ -3462,7 +3565,29 @@ func typecheckas(n *Node) {
 
 	if n.Left.Name != nil && n.Left.Name.Defn == n && n.Left.Name.Param.Ntype == nil {
 		n.Right = defaultlit(n.Right, nil)
-		n.Left.Type = n.Right.Type
+		n.Left.Type = n.Right.Type 
+
+		var ti types.TypeInfo  
+		ti.TypeInfo( n.Left.Type) 
+		if ti.IsClass { 
+//			fmt.Printf("Assign a class type ti=%s\n", ti.TypeName ) 
+			iname := strings.Replace( ti.TypeName, syntax.ClassSuffix, "", 1 ) 
+   
+			if ti.Pkg != nil { 
+				isym, ok := ti.Pkg.LookupOK( iname ) 
+				if ok { 
+					tnode := asNode( isym.Def ) // Major Kludge Monger Mess <<<<---- Right Here 
+					if tnode != nil {  
+						if tnode.Type == nil { 
+							resolve( tnode ) 
+						} 
+						if tnode.Type != nil {
+							n.Left.Type = tnode.Type  
+						}
+					}
+				}
+			} 
+		}
 	}
 
 	// second half of dance.

@@ -3,6 +3,9 @@
 // license that can be found in the LICENSE file.
 
 package syntax
+import "fmt" 
+
+const ClassSuffix = "$"
 
 // ----------------------------------------------------------------------------
 // Nodes
@@ -243,6 +246,7 @@ type (
 	SliceType struct {
 		Elem Expr
 		expr
+		isSliceof bool 
 	}
 
 	// ...Elem
@@ -255,7 +259,11 @@ type (
 	StructType struct {
 		FieldList []*Field
 		TagList   []*BasicLit // i >= len(TagList) || TagList[i] == nil means no tag for field i
-		expr
+		IsClass    bool 
+//		Implements bool 
+		ImpList   []*Name 
+		ExtList   []*Name 
+		expr 
 	}
 
 	// Name Type
@@ -269,6 +277,14 @@ type (
 	// interface { MethodList[0]; MethodList[1]; ... }
 	InterfaceType struct {
 		MethodList []*Field
+		IsClass bool 
+		expr
+	}
+
+	ClassType struct { 
+		Name string 
+		I InterfaceType
+		S StructType 
 		expr
 	}
 
@@ -297,6 +313,244 @@ type (
 type expr struct{ node }
 
 func (*expr) aExpr() {}
+
+
+/////////////////////////////////////////////////////////////////
+
+
+func FmtType( typ Expr ) string { 
+	str := "NoType" 
+	switch typ := typ.(type) { 
+	case *Name : 
+		str = typ.Value 	
+	case *Operation : 
+		str = fmt.Sprintf( "%v", typ.Op ) 
+	default: 
+		str = "(" + fmt.Sprintf( "%T", typ ) + ")"  
+	}	
+	return str 
+}
+
+func MakeClassReceiver( typ Expr ) Expr { 
+
+	switch typ := typ.(type) { 
+	case *Operation : 
+		name, ok := typ.X.(*Name) 
+		if ok { 
+			name.Value = name.Value + ClassSuffix 
+		}
+	case *Name : 
+		typ.Value = typ.Value + ClassSuffix 
+		star := new( Operation ) 
+		star.Op = Mul 
+		star.pos = typ.pos 
+		star.X = typ 
+		star.expr = typ.expr 
+		star.node = typ.node 		
+		return star 
+    } 
+	return typ 
+ /*
+	name, ok := typ.(*Name) 
+	if !ok { return typ } 
+	name.Value = name.Value + ClassSuffix 
+	star := new( Operation ) 
+	star.Op = Mul 
+    star.pos = name.pos 
+	star.X = name 
+	star.expr = name.expr 
+	star.node = name.node 
+	return star 
+*/ 
+} 
+
+
+type NamedType struct { 
+	IsNamed bool 
+	IsPtr bool 
+	Qual string 
+	Name string 
+} 
+
+
+func ( nt *NamedType ) Fmt() string { 
+	s := nt.Qual 
+	if nt.IsPtr { 
+		s = "*" + s 
+	}
+	if len(nt.Qual) > 0 {
+		s += "." 
+	}
+	s += nt.Name 
+	return s 
+} 
+
+
+func ( nt *NamedType ) FullName() string { 
+	s := nt.Qual 
+	if len(s) > 0 { 
+		s += "." 
+	}
+	s += nt.Name 
+	return s 
+}
+
+
+
+func (nt *NamedType) NamedType( typ Expr ) { 
+	nt.IsNamed = false 
+	nt.IsPtr = false 
+	nt.Qual = "" 
+	nt.Name = "" 
+
+	if typ == nil { return } 
+	switch typ := typ.(type) { 
+	case *Name : 
+		nt.IsNamed = true 
+		nt.Qual = ""
+		nt.Name = typ.Value 
+	case *Operation : 
+		if typ.Op == Mul { 
+			nt.NamedType( typ.X ) 
+			nt.IsPtr = true 
+		}
+	case *SelectorExpr :
+		nt.NamedType( typ.X ) 
+		if typ.Sel != nil { 
+			nt.Qual = nt.Name 
+			nt.Name = typ.Sel.Value 
+		}  
+	default: 
+		nt.Name = fmt.Sprintf( "%T", typ )  
+	}
+}		  
+
+func ( nt *NamedType ) SetQualName( qual string, name string, isPtr bool ) { 
+	nt.IsNamed = true 
+	nt.Qual = qual 
+	nt.Name = name 
+	nt.IsPtr = isPtr 
+} 
+
+func ( nt *NamedType ) MakeTypeExpr() Expr { //TODO hande Selector and Ptr???  
+	nameExp := new( Name ) 
+	nameExp.Value = nt.Name 
+	return nameExp     
+}
+
+
+func ( st *StructType ) Dump( name string ) { 
+	fmt.Printf( "StructType=%s NumFields=%d\n", name, len(st.FieldList) )  
+	for _, fld := range st.FieldList { 
+		var nstr string = "NoName"
+		if fld.Name != nil { 
+			nstr = fld.Name.Value 
+		}		
+		var nt NamedType 
+		nt.NamedType( fld.Type )
+		fmt.Printf( "    %-10s  %s\n", nstr, nt.Fmt() ) 
+	}
+	fmt.Println() 
+} 
+
+func ( it *InterfaceType ) Dump( name string ) { 
+	fmt.Printf( "InterfaceType=%s NumMethods=%d\n", name, len(it.MethodList) )  
+} 
+
+
+func ( cl* ClassType ) Dump( name string ) { 
+	fmt.Printf( "ClassType=%s\n", name ) 
+	cl.I.Dump( name ) 
+	cl.S.Dump( name ) 
+	fmt.Println( "" )
+}
+
+
+func ( st *StructType ) InsertImpType( tname string ) { 
+	var nt NamedType
+	for _, fld := range st.FieldList { 
+		if fld.Name == nil { // Embedded Type 
+			nt.NamedType( fld.Type ) // Qualified type???
+			if nt.Name == tname { // already here 
+				return 
+			}
+		} 
+	}
+	nt.SetQualName( "", tname, false )	
+	fld := new( Field ) 
+	fld.Type = nt.MakeTypeExpr() 	
+	st.FieldList = append( st.FieldList, fld ) 
+} 
+
+
+func ( it *InterfaceType ) InsertImpType( tname string ) { 
+	var nt NamedType 
+	nt.SetQualName( "", tname, false )
+	fld := new( Field ) 
+	fld.Type = nt.MakeTypeExpr() 
+	it.MethodList = append( it.MethodList, fld ) 
+}
+
+
+
+func ( cl *ClassType ) InsertImpType( tname *Name ) { 
+	strname := tname.Value 
+//fmt.Println( "InsertImpType Name.Value=", strname ) 	
+	cl.S.InsertImpType( strname + ClassSuffix ) 
+	cl.I.InsertImpType( strname )	
+} 
+
+
+/*
+func ( f *FuncDecl ) TranslateInterfaceMethod() { // Moves the receiver into ParamList - as first item  
+	if f.Recv == nil { return } 
+	if f.Type == nil { return } 
+	recvslice := []*Field{ f.Recv } 
+	f.Type.ParamList = append( recvslice, f.Type.ParamList...	) 
+	f.Recv = nil 
+}
+
+
+
+func DefinedTypeName( tExpr Expr ) ( string, bool ) { 
+	typename := ""
+	isPtr := false 
+
+	switch tExpr.(type) { 
+	case *Name : 
+		typename = tExpr.(*Name).Value  
+	case *Operation : 
+		isPtr = true 		
+		oper := tExpr.(*Operation) 
+		deftype, ok := oper.X.(*Name) 
+		if ok { 
+			typename = deftype.Value
+		}
+	}
+	return typename, isPtr 
+}
+
+
+type MethodKey struct { 
+	recvName string 
+	funcName string 
+} 
+
+
+func ( f *FuncDecl ) MakeMethodKey() ( MethodKey,  bool ) { 
+	var mkey MethodKey 
+	recvPtr := false 
+	if f == nil { return mkey, recvPtr } 
+	if f.Name == nil { return mkey, recvPtr } 
+	mkey.funcName = f.Name.Value 
+	if f.Recv == nil { return mkey, recvPtr } 
+	if f.Recv.Type == nil { return mkey, recvPtr } 
+	mkey.recvName, recvPtr = DefinedTypeName( f.Recv.Type )
+	return mkey, recvPtr  
+} 
+*/ 
+
+///////////////////////////////////////////////////////////////////////
 
 type ChanDir uint
 
@@ -386,9 +640,11 @@ type (
 		Then *BlockStmt
 		Else Stmt // either nil, *IfStmt, or *BlockStmt
 		stmt
+		ElseOnNewLine bool 
 	}
 
 	ForStmt struct {
+		Tok token // For or While 
 		Init SimpleStmt // incl. *RangeClause
 		Cond Expr
 		Post SimpleStmt

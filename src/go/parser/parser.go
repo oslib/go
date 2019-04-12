@@ -68,6 +68,7 @@ type parser struct {
 	// (maintained by open/close LabelScope)
 	labelScope  *ast.Scope     // label scope for current function
 	targetStack [][]*ast.Ident // stack of unresolved labels
+    replay []*scannerSpot 
 }
 
 func (p *parser) init(fset *token.FileSet, filename string, src []byte, mode Mode) {
@@ -313,7 +314,52 @@ func (p *parser) consumeCommentGroup(n int) (comments *ast.CommentGroup, endline
 // Lead and line comments may be considered documentation that is
 // stored in the AST.
 //
-func (p *parser) next() {
+
+
+type scannerSpot struct { 
+	pos token.Pos   // token position
+	tok token.Token // one token look-ahead
+	lit string      // token literal
+} 
+
+
+func (p *parser) addSave() { 
+    sv := new( scannerSpot ) 
+    sv.pos = p.pos  
+    sv.tok = p.tok 
+    sv.lit = p.lit 
+    p.replay = append( p.replay, sv ) 
+} 
+
+
+func (p *parser) restoreSave() { 
+    if len(p.replay) > 0 { 
+        sv := p.replay[ 0 ] 
+        p.replay[ 0 ] = nil 
+        copy( p.replay, p.replay[1:] )
+        p.replay = p.replay[:len(p.replay) - 1]
+        p.pos = sv.pos  
+        p.tok = sv.tok 
+        p.lit = sv.lit 
+    }     
+}
+
+
+func (p* parser) clearSave() { 
+    p.replay = nil 
+}
+ 
+
+func (p *parser) next() { 
+    if len(p.replay) == 0 { 
+        p.nextDirect() 
+        return 
+    }
+    p.restoreSave() 
+}
+
+
+func (p *parser) nextDirect() {
 	p.leadComment = nil
 	p.lineComment = nil
 	prev := p.pos
@@ -483,6 +529,7 @@ var stmtStart = map[token.Token]bool{
 	token.DEFER:       true,
 	token.FALLTHROUGH: true,
 	token.FOR:         true,
+    token.WHILE:       true, 
 	token.GO:          true,
 	token.GOTO:        true,
 	token.IF:          true,
@@ -651,26 +698,31 @@ func (p *parser) parseTypeName() ast.Expr {
 	return ident
 }
 
-func (p *parser) parseArrayType() ast.Expr {
+func (p *parser) parseArrayType( keyword token.Token ) ast.Expr {
 	if p.trace {
 		defer un(trace(p, "ArrayType"))
 	}
+	lbrack := p.expect( keyword ) 
+	slice := false  
 
-	lbrack := p.expect(token.LBRACK)
-	p.exprLev++
 	var len ast.Expr
-	// always permit ellipsis for more fault-tolerant parsing
-	if p.tok == token.ELLIPSIS {
-		len = &ast.Ellipsis{Ellipsis: p.pos}
-		p.next()
-	} else if p.tok != token.RBRACK {
-		len = p.parseRhs()
-	}
-	p.exprLev--
-	p.expect(token.RBRACK)
+	if keyword == token.LBRACK {   
+	  	p.exprLev++
+
+		// always permit ellipsis for more fault-tolerant parsing
+		if p.tok == token.ELLIPSIS {
+			len = &ast.Ellipsis{Ellipsis: p.pos}
+			p.next()
+		} else if p.tok != token.RBRACK {
+			len = p.parseRhs()
+		}
+		p.exprLev--
+		p.expect(token.RBRACK)
+	} else { slice = true }
+
 	elt := p.parseType()
 
-	return &ast.ArrayType{Lbrack: lbrack, Len: len, Elt: elt}
+	return &ast.ArrayType{Lbrack: lbrack, Len: len, Elt: elt, IsSliceOf: slice }
 }
 
 func (p *parser) makeIdentList(list []ast.Expr) []*ast.Ident {
@@ -688,6 +740,8 @@ func (p *parser) makeIdentList(list []ast.Expr) []*ast.Ident {
 	}
 	return idents
 }
+
+
 
 func (p *parser) parseFieldDecl(scope *ast.Scope) *ast.Field {
 	if p.trace {
@@ -735,39 +789,132 @@ func (p *parser) parseFieldDecl(scope *ast.Scope) *ast.Field {
 
 	p.expectSemi() // call before accessing p.linecomment
 
-	field := &ast.Field{Doc: doc, Names: idents, Type: typ, Tag: tag, Comment: p.lineComment}
+	field := &ast.Field{Doc: doc, Names: idents, Type: typ, Tag: tag, Comment: p.lineComment, Member: true}
 	p.declare(field, nil, scope, ast.Var, idents...)
 	p.resolve(typ)
 
 	return field
 }
 
+
 func (p *parser) parseStructType() *ast.StructType {
 	if p.trace {
 		defer un(trace(p, "StructType"))
 	}
+	ret := new(ast.StructType) 
+	ret.Fields = new(ast.FieldList) 
+	ret.Struct = p.expect(token.STRUCT) 
 
-	pos := p.expect(token.STRUCT)
-	lbrace := p.expect(token.LBRACE)
+	for p.tok == token.IMPLEMENTS { 
+		p.next() 
+		for { 
+			if p.tok == token.IDENT { 
+				ident := &ast.Ident{ 
+	 				NamePos: p.pos, 
+					Name:    p.lit,
+				} 
+				ret.ImpList = append( ret.ImpList, ident ) 
+				p.next() 
+				if p.tok != token.COMMA { break }
+				p.next() 
+			} else { 
+				p.expect( token.IDENT ) // use expect() error handling
+			}
+		}				 	
+	}										
+
+	ret.Fields.Opening = p.expect(token.LBRACE)
 	scope := ast.NewScope(nil) // struct scope
-	var list []*ast.Field
+
+//	var list []*ast.Field
+
 	for p.tok == token.IDENT || p.tok == token.MUL || p.tok == token.LPAREN {
 		// a field declaration cannot start with a '(' but we accept
 		// it here for more robust parsing and better error messages
 		// (parseFieldDecl will check and complain if necessary)
-		list = append(list, p.parseFieldDecl(scope))
+		ret.Fields.List = append(ret.Fields.List, p.parseFieldDecl(scope))
 	}
-	rbrace := p.expect(token.RBRACE)
 
-	return &ast.StructType{
-		Struct: pos,
-		Fields: &ast.FieldList{
-			Opening: lbrace,
-			List:    list,
-			Closing: rbrace,
-		},
-	}
+	ret.Fields.Closing = p.expect(token.RBRACE)
+	return ret 
+//	return &ast.StructType{
+//		Struct: pos,
+//		Fields: &ast.FieldList{
+//			Opening: lbrace,
+//			List:    list,
+//			Closing: rbrace,
+//		},
+//	}
 }
+
+
+func (p *parser) parseClassType() *ast.ClassType { 
+	if p.trace { 
+		defer un(trace(p, "ClassType" )) 
+	}
+	ret := new(ast.ClassType)
+	ret.Members = new(ast.FieldList)  
+	ret.Class = p.expect( token.CLASS ) 
+
+	impList := false 
+	for p.tok == token.IMPLEMENTS || p.tok == token.EXTENDS { 
+		impList = p.tok == token.IMPLEMENTS 		
+		p.next() 
+
+		for { 
+			if p.tok == token.IDENT { 
+				ident := &ast.Ident{ 
+	 				NamePos: p.pos, 
+					Name:    p.lit,
+				} 
+				if impList { 
+					ret.ImpList = append( ret.ImpList, ident ) 
+				} else { 
+					ret.ExtList = append( ret.ExtList, ident ) 
+				}
+				p.next() 
+				if p.tok != token.COMMA { break }
+				p.next() 
+			} else { 
+				p.expect( token.IDENT ) // use expect() error handling
+			}
+		}				 	
+	}										
+
+	ret.Members.Opening = p.expect( token.LBRACE ) 
+	scope := ast.NewScope(nil) // class scope 
+
+	var field *ast.Field
+	for p.tok == token.IDENT || p.tok == token.MUL || p.tok == token.LPAREN {
+		// a field declaration cannot start with a '(' but we accept
+		// it here for more robust parsing and better error messages
+		// (parseFieldDecl will check and complain if necessary) 
+		if p.tok == token.IDENT { // Might be a member or a method 
+			p.addSave() 
+			p.nextDirect()
+			p.addSave()  
+			if p.tok == token.LPAREN { // Must be a member function 
+				p.next() // Should be the token.IDENT 
+				field = p.parseMethodSpec( scope ) 
+			} else { // Nope, just a member variable
+				p.next() // Should be the token.IDENT 
+				field = p.parseFieldDecl( scope )
+			}
+		} else { 
+			field = p.parseFieldDecl( scope )  
+		} 
+		if field != nil { 
+			ret.Members.List = append( ret.Members.List, field ) 
+		} 
+	}
+	ret.Members.Closing = p.expect(token.RBRACE)
+	return ret 
+}
+
+
+/////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////
+
 
 func (p *parser) parsePointerType() *ast.StarExpr {
 	if p.trace {
@@ -947,7 +1094,7 @@ func (p *parser) parseMethodSpec(scope *ast.Scope) *ast.Field {
 	}
 	p.expectSemi() // call before accessing p.linecomment
 
-	spec := &ast.Field{Doc: doc, Names: idents, Type: typ, Comment: p.lineComment}
+	spec := &ast.Field{Doc: doc, Names: idents, Type: typ, Comment: p.lineComment, Member: false }
 	p.declare(spec, nil, scope, ast.Fun, idents...)
 
 	return spec
@@ -1021,10 +1168,12 @@ func (p *parser) tryIdentOrType() ast.Expr {
 	switch p.tok {
 	case token.IDENT:
 		return p.parseTypeName()
-	case token.LBRACK:
-		return p.parseArrayType()
+	case token.LBRACK, token.SLICEOF :
+	 	return p.parseArrayType( p.tok )
 	case token.STRUCT:
-		return p.parseStructType()
+		return p.parseStructType() 
+	case token.CLASS: 
+		return p.parseClassType() 
 	case token.MUL:
 		return p.parsePointerType()
 	case token.FUNC:
@@ -1520,7 +1669,7 @@ func (p *parser) parseUnaryExpr(lhs bool) ast.Expr {
 	}
 
 	switch p.tok {
-	case token.ADD, token.SUB, token.NOT, token.XOR, token.AND:
+	case token.ADD, token.SUB, token.NOTop, token.TNOT, token.XOR, token.ANDop:
 		pos, op := p.pos, p.tok
 		p.next()
 		x := p.parseUnaryExpr(false)
@@ -1899,8 +2048,17 @@ func (p *parser) parseIfStmt() *ast.IfStmt {
 	init, cond := p.parseIfHeader()
 	body := p.parseBlockStmt()
 
+    newLine := false 
+    if ( p.tok == token.SEMICOLON ) { 
+        p.addSave() 
+        p.nextDirect() 
+        p.addSave() 
+        newLine = true 
+    } 
+
 	var else_ ast.Stmt
-	if p.tok == token.ELSE {
+	if p.tok == token.ELSE { 
+		p.clearSave() 
 		p.next()
 		switch p.tok {
 		case token.IF:
@@ -1912,11 +2070,11 @@ func (p *parser) parseIfStmt() *ast.IfStmt {
 			p.errorExpected(p.pos, "if statement or block")
 			else_ = &ast.BadStmt{From: p.pos, To: p.pos}
 		}
-	} else {
+	} else { 
+		p.next() 
 		p.expectSemi()
 	}
-
-	return &ast.IfStmt{If: pos, Init: init, Cond: cond, Body: body, Else: else_}
+	return &ast.IfStmt{If: pos, Init: init, Cond: cond, Body: body, Else: else_, ElseOnNewLine: newLine, }
 }
 
 func (p *parser) parseTypeList() (list []ast.Expr) {
@@ -2119,12 +2277,12 @@ func (p *parser) parseSelectStmt() *ast.SelectStmt {
 	return &ast.SelectStmt{Select: pos, Body: body}
 }
 
-func (p *parser) parseForStmt() ast.Stmt {
+func (p *parser) parseForStmt( keyword token.Token ) ast.Stmt {
 	if p.trace {
 		defer un(trace(p, "ForStmt"))
 	}
 
-	pos := p.expect(token.FOR)
+	pos := p.expect( keyword )
 	p.openScope()
 	defer p.closeScope()
 
@@ -2189,6 +2347,7 @@ func (p *parser) parseForStmt() ast.Stmt {
 			Tok:    as.Tok,
 			X:      x,
 			Body:   body,
+			Keyword: keyword, 
 		}
 	}
 
@@ -2199,6 +2358,7 @@ func (p *parser) parseForStmt() ast.Stmt {
 		Cond: p.makeExpr(s2, "boolean or range expression"),
 		Post: s3,
 		Body: body,
+		Keyword: keyword, 
 	}
 }
 
@@ -2213,8 +2373,8 @@ func (p *parser) parseStmt() (s ast.Stmt) {
 	case
 		// tokens that may start an expression
 		token.IDENT, token.INT, token.FLOAT, token.IMAG, token.CHAR, token.STRING, token.FUNC, token.LPAREN, // operands
-		token.LBRACK, token.STRUCT, token.MAP, token.CHAN, token.INTERFACE, // composite types
-		token.ADD, token.SUB, token.MUL, token.AND, token.XOR, token.ARROW, token.NOT: // unary operators
+		token.LBRACK, token.SLICEOF, token.STRUCT, token.MAP, token.CHAN, token.INTERFACE, // composite types
+		token.ADD, token.SUB, token.MUL, token.ANDop, token.XOR, token.ARROW, token.NOTop, token.TNOT : // unary operators
 		s, _ = p.parseSimpleStmt(labelOk)
 		// because of the required look-ahead, labeled statements are
 		// parsed by parseSimpleStmt - don't expect a semicolon after
@@ -2239,8 +2399,8 @@ func (p *parser) parseStmt() (s ast.Stmt) {
 		s = p.parseSwitchStmt()
 	case token.SELECT:
 		s = p.parseSelectStmt()
-	case token.FOR:
-		s = p.parseForStmt()
+	case token.FOR, token.WHILE :
+		s = p.parseForStmt( p.tok )
 	case token.SEMICOLON:
 		// Is it ever possible to have an implicit semicolon
 		// producing an empty statement in a valid program?

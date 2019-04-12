@@ -4,9 +4,9 @@ package syntax
 
 import "strconv"
 
-const _token_name = "EOFnameliteralopop=opop=:=<-*([{)]},;:....breakcasechanconstcontinuedefaultdeferelsefallthroughforfuncgogotoifimportinterfacemappackagerangereturnselectstructswitchtypevar"
+const _token_name = "EOFnameliteralopop=opop=:=<-*([{)]},;:....breakcaseclasschanconstcontinuedefaultdeferelseextendsfallthroughforwhilefuncgogotoifimportinterfaceimplementsmappackagerangereturnselectsliceofstructswitchtypevar"
 
-var _token_index = [...]uint8{0, 3, 7, 14, 16, 19, 23, 24, 26, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 42, 47, 51, 55, 60, 68, 75, 80, 84, 95, 98, 102, 104, 108, 110, 116, 125, 128, 135, 140, 146, 152, 158, 164, 168, 171, 171}
+var _token_index = [...]uint8{0, 3, 7, 14, 16, 19, 23, 24, 26, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 42, 47, 51, 56, 60, 65, 73, 80, 85, 89, 96, 107, 110, 115, 119, 121, 125, 127, 133, 142, 152, 155, 162, 167, 173, 179, 186, 192, 198, 202, 205, 205}
 
 func (i token) String() string {
 	i -= 1

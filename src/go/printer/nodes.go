@@ -16,7 +16,7 @@ import (
 	"strconv"
 	"strings"
 	"unicode"
-	"unicode/utf8"
+	"unicode/utf8" 
 )
 
 // Formatting issues:
@@ -436,7 +436,7 @@ func (p *printer) setLineComment(text string) {
 	p.setComment(&ast.CommentGroup{List: []*ast.Comment{{Slash: token.NoPos, Text: text}}})
 }
 
-func (p *printer) fieldList(fields *ast.FieldList, isStruct, isIncomplete bool) {
+func (p *printer) fieldList(fields *ast.FieldList, isIncomplete bool) {
 	lbrace := fields.Opening
 	list := fields.List
 	rbrace := fields.Closing
@@ -454,7 +454,7 @@ func (p *printer) fieldList(fields *ast.FieldList, isStruct, isIncomplete bool) 
 			// (don't use identList and ignore source line breaks)
 			p.print(lbrace, token.LBRACE, blank)
 			f := list[0]
-			if isStruct {
+			if f.Member {
 				for i, x := range f.Names {
 					if i > 0 {
 						// no comments so no need for comma position
@@ -487,8 +487,74 @@ func (p *printer) fieldList(fields *ast.FieldList, isStruct, isIncomplete bool) 
 		p.print(formfeed)
 	}
 
-	if isStruct {
+	sep := vtab 
+	if len( list ) == 1 { 
+		sep = blank 
+	} 
+	var line int
 
+	for i, f := range list { 
+		if f.Member { 
+			if i > 0 {
+				p.linebreak(p.lineFor(f.Pos()), 1, ignore, p.linesFrom(line) > 0)
+			}
+			extraTabs := 0
+			p.setComment(f.Doc)
+			p.recordLine(&line)
+			if len(f.Names) > 0 {
+				// named fields
+				p.identList(f.Names, false)
+				p.print(sep)
+				p.expr(f.Type)
+				extraTabs = 1
+			} else {
+				// anonymous field
+				p.expr(f.Type)
+				extraTabs = 2
+			}
+			if f.Tag != nil {
+				if len(f.Names) > 0 && sep == vtab {
+					p.print(sep)
+				}
+				p.print(sep)
+				p.expr(f.Tag)
+				extraTabs = 0
+			}
+			if f.Comment != nil {
+				for ; extraTabs > 0; extraTabs-- {
+					p.print(sep)
+				}
+				p.setComment(f.Comment)
+			}
+		} else { 
+			if i > 0 {
+				p.linebreak(p.lineFor(f.Pos()), 1, ignore, p.linesFrom(line) > 0)
+			}
+			p.setComment(f.Doc)
+			p.recordLine(&line)
+			if ftyp, isFtyp := f.Type.(*ast.FuncType); isFtyp {
+				// method
+				p.expr(f.Names[0])
+				p.signature(ftyp.Params, ftyp.Results)
+			} else {
+				// embedded interface
+				p.expr(f.Type)
+			}
+			p.setComment(f.Comment)
+		}
+	}
+			
+	if isIncomplete {
+		if len(list) > 0 {
+			p.print(formfeed)
+		}
+		p.flush(p.posFor(rbrace), token.RBRACE) // make sure we don't lose the last line comment
+		p.setLineComment("// contains filtered or unexported methods")
+	}
+	p.print(unindent, formfeed, rbrace, token.RBRACE)
+
+/*
+	if isStruct {
 		sep := vtab
 		if len(list) == 1 {
 			sep = blank
@@ -561,10 +627,11 @@ func (p *printer) fieldList(fields *ast.FieldList, isStruct, isIncomplete bool) 
 			p.flush(p.posFor(rbrace), token.RBRACE) // make sure we don't lose the last line comment
 			p.setLineComment("// contains filtered or unexported methods")
 		}
-
 	}
 	p.print(unindent, formfeed, rbrace, token.RBRACE)
+*/
 }
+
 
 // ----------------------------------------------------------------------------
 // Expressions
@@ -782,7 +849,8 @@ func (p *printer) expr1(expr ast.Expr, prec1, depth int) {
 			p.print(token.RPAREN)
 		} else {
 			// no parenthesis needed
-			p.print(x.Op)
+			p.print(x.Op) 
+            if x.Op == token.TNOT { p.print( blank ) }
 			if x.Op == token.RANGE {
 				// TODO(gri) Remove this code if it cannot be reached.
 				p.print(blank)
@@ -926,16 +994,25 @@ func (p *printer) expr1(expr ast.Expr, prec1, depth int) {
 		}
 
 	case *ast.ArrayType:
-		p.print(token.LBRACK)
-		if x.Len != nil {
-			p.expr(x.Len)
-		}
-		p.print(token.RBRACK)
+        if x.IsSliceOf { 
+            p.print( token.SLICEOF ) 
+            p.print( blank ) 
+        } else { 
+	  		p.print(token.LBRACK)
+			if x.Len != nil {
+				p.expr(x.Len)
+			}
+			p.print(token.RBRACK)
+        } 
 		p.expr(x.Elt)
 
 	case *ast.StructType:
-		p.print(token.STRUCT)
-		p.fieldList(x.Fields, true, x.Incomplete)
+		p.print(token.STRUCT ) 
+		if len( x.ImpList ) > 0 { 
+			p.print(blank, token.IMPLEMENTS, blank)  
+
+		}
+		p.fieldList(x.Fields, x.Incomplete)
 
 	case *ast.FuncType:
 		p.print(token.FUNC)
@@ -943,7 +1020,19 @@ func (p *printer) expr1(expr ast.Expr, prec1, depth int) {
 
 	case *ast.InterfaceType:
 		p.print(token.INTERFACE)
-		p.fieldList(x.Methods, false, x.Incomplete)
+		p.fieldList(x.Methods, x.Incomplete)
+
+	case *ast.ClassType: 
+		p.print( token.CLASS ) 
+		if len( x.ExtList ) > 0 { 
+			p.print( blank, token.EXTENDS, blank ) 
+			p.identList( x.ExtList, false ) 
+		}
+		if len( x.ImpList ) > 0 { 
+			p.print( blank, token.IMPLEMENTS, blank ) 
+			p.identList( x.ImpList, false ) 
+		}
+		p.fieldList( x.Members, x.Incomplete ) 
 
 	case *ast.MapType:
 		p.print(token.MAP, token.LBRACK)
@@ -1258,9 +1347,15 @@ func (p *printer) stmt(stmt ast.Stmt, nextIsRBrace bool) {
 		p.print(token.IF)
 		p.controlClause(false, s.Init, s.Cond, nil)
 		p.block(s.Body, 1)
-		if s.Else != nil {
-			p.print(blank, token.ELSE, blank)
-			switch s.Else.(type) {
+		if s.Else != nil { 
+			if s.ElseOnNewLine { 
+				p.print( "\n" ) 
+				p.print( stmt.Pos() ) 
+				p.print( token.ELSE, blank )  
+			} else {
+				p.print(blank, token.ELSE, blank)
+		}			
+		switch s.Else.(type) {
 			case *ast.BlockStmt, *ast.IfStmt:
 				p.stmt(s.Else, nextIsRBrace)
 			default:
@@ -1321,12 +1416,14 @@ func (p *printer) stmt(stmt ast.Stmt, nextIsRBrace bool) {
 		}
 
 	case *ast.ForStmt:
-		p.print(token.FOR)
+		p.print( s.Keyword )
+		//p.print(token.FOR)
 		p.controlClause(true, s.Init, s.Cond, s.Post)
 		p.block(s.Body, 1)
 
-	case *ast.RangeStmt:
-		p.print(token.FOR, blank)
+	case *ast.RangeStmt: 
+		p.print( s.Keyword, blank ) 
+		//p.print(token.FOR, blank)
 		if s.Key != nil {
 			p.expr(s.Key)
 			if s.Value != nil {

@@ -114,7 +114,7 @@ func (s simplifier) simplifyLiteral(typ reflect.Value, astType, x ast.Expr, px *
 	// and the element is & of a composite literal of type T,
 	// the inner &T may be omitted.
 	if ptr, ok := astType.(*ast.StarExpr); ok {
-		if addr, ok := x.(*ast.UnaryExpr); ok && addr.Op == token.AND {
+		if addr, ok := x.(*ast.UnaryExpr); ok && addr.Op == token.ANDop {
 			if inner, ok := addr.X.(*ast.CompositeLit); ok {
 				if match(nil, reflect.ValueOf(ptr.X), reflect.ValueOf(inner.Type)) {
 					inner.Type = nil // drop T

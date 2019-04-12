@@ -24,7 +24,7 @@ const (
 	AESE
 	AESIMC
 	AESMC
-	AND
+	ANDop
 	ANDS
 	ASR
 	ASRV
@@ -231,7 +231,7 @@ const (
 	NGC
 	NGCS
 	NOP
-	NOT
+	NOTop
 	ORN
 	ORR
 	PMUL
@@ -493,7 +493,7 @@ var opstr = [...]string{
 	AESE:      "AESE",
 	AESIMC:    "AESIMC",
 	AESMC:     "AESMC",
-	AND:       "AND",
+	ANDop:       "AND",
 	ANDS:      "ANDS",
 	ASR:       "ASR",
 	ASRV:      "ASRV",
@@ -700,7 +700,7 @@ var opstr = [...]string{
 	NGC:       "NGC",
 	NGCS:      "NGCS",
 	NOP:       "NOP",
-	NOT:       "NOT",
+	NOTop:       "NOT",
 	ORN:       "ORN",
 	ORR:       "ORR",
 	PMUL:      "PMUL",
@@ -1000,13 +1000,13 @@ var instFormats = [...]instFormat{
 	// ADRP <Xd>, <label>
 	{0x9f000000, 0x90000000, ADRP, instArgs{arg_Xd, arg_slabel_immhi_immlo_12}, nil},
 	// AND <Wd|WSP>, <Wn>, #<imm>
-	{0xffc00000, 0x12000000, AND, instArgs{arg_Wds, arg_Wn, arg_immediate_bitmask_32_imms_immr}, nil},
+	{0xffc00000, 0x12000000, ANDop, instArgs{arg_Wds, arg_Wn, arg_immediate_bitmask_32_imms_immr}, nil},
 	// AND <Xd|SP>, <Xn>, #<imm>
-	{0xff800000, 0x92000000, AND, instArgs{arg_Xds, arg_Xn, arg_immediate_bitmask_64_N_imms_immr}, nil},
+	{0xff800000, 0x92000000, ANDop, instArgs{arg_Xds, arg_Xn, arg_immediate_bitmask_64_N_imms_immr}, nil},
 	// AND <Wd>, <Wn>, <Wm> {, <shift> #<amount> }
-	{0xff208000, 0x0a000000, AND, instArgs{arg_Wd, arg_Wn, arg_Wm_shift__LSL_0__LSR_1__ASR_2__ROR_3__0_31}, nil},
+	{0xff208000, 0x0a000000, ANDop, instArgs{arg_Wd, arg_Wn, arg_Wm_shift__LSL_0__LSR_1__ASR_2__ROR_3__0_31}, nil},
 	// AND <Xd>, <Xn>, <Xm> {, <shift> #<amount> }
-	{0xff200000, 0x8a000000, AND, instArgs{arg_Xd, arg_Xn, arg_Xm_shift__LSL_0__LSR_1__ASR_2__ROR_3__0_63}, nil},
+	{0xff200000, 0x8a000000, ANDop, instArgs{arg_Xd, arg_Xn, arg_Xm_shift__LSL_0__LSR_1__ASR_2__ROR_3__0_63}, nil},
 	// TST <Wn>, #<imm>
 	{0xffc0001f, 0x7200001f, TST, instArgs{arg_Wn, arg_immediate_bitmask_32_imms_immr}, nil},
 	// ANDS <Wd>, <Wn>, #<imm>
@@ -1762,7 +1762,7 @@ var instFormats = [...]instFormat{
 	// AESMC <Vd>.16B, <Vn>.16B
 	{0xfffffc00, 0x4e286800, AESMC, instArgs{arg_Vd_arrangement_16B, arg_Vn_arrangement_16B}, nil},
 	// AND <Vd>.<t>, <Vn>.<t>, <Vm>.<t>
-	{0xbfe0fc00, 0x0e201c00, AND, instArgs{arg_Vd_arrangement_Q___8B_0__16B_1, arg_Vn_arrangement_Q___8B_0__16B_1, arg_Vm_arrangement_Q___8B_0__16B_1}, nil},
+	{0xbfe0fc00, 0x0e201c00, ANDop, instArgs{arg_Vd_arrangement_Q___8B_0__16B_1, arg_Vn_arrangement_Q___8B_0__16B_1, arg_Vm_arrangement_Q___8B_0__16B_1}, nil},
 	// BIC <Vd>.<t>, #<imm8>{, LSL #<amount>}
 	{0xbff8dc00, 0x2f009400, BIC, instArgs{arg_Vd_arrangement_Q___4H_0__8H_1, arg_immediate_OptLSL__a_b_c_d_e_f_g_h_cmode__0_0__8_1}, nil},
 	// BIC <Vd>.<t_1>, #<imm8>{, LSL #<amount>}
@@ -2590,7 +2590,7 @@ var instFormats = [...]instFormat{
 	// MVN <Vd>.<t>, <Vn>.<t>
 	{0xbffffc00, 0x2e205800, MVN, instArgs{arg_Vd_arrangement_Q___8B_0__16B_1, arg_Vn_arrangement_Q___8B_0__16B_1}, nil},
 	// NOT <Vd>.<t>, <Vn>.<t>
-	{0xbffffc00, 0x2e205800, NOT, instArgs{arg_Vd_arrangement_Q___8B_0__16B_1, arg_Vn_arrangement_Q___8B_0__16B_1}, nil},
+	{0xbffffc00, 0x2e205800, NOTop, instArgs{arg_Vd_arrangement_Q___8B_0__16B_1, arg_Vn_arrangement_Q___8B_0__16B_1}, nil},
 	// MVNI <Vd>.<t>, #<imm8>{, LSL #<amount>}
 	{0xbff8dc00, 0x2f008400, MVNI, instArgs{arg_Vd_arrangement_Q___4H_0__8H_1, arg_immediate_OptLSL__a_b_c_d_e_f_g_h_cmode__0_0__8_1}, nil},
 	// MVNI <Vd>.<t_1>, #<imm8>{, LSL #<amount>}
