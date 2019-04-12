@@ -403,11 +403,11 @@ func (t Token) Close() error {
 }
 
 // getInfo retrieves a specified type of information about an access token.
-func (t Token) getInfo(class uint32, initSize int) (unsafe.Pointer, error) {
+func (t Token) getInfo( tclass uint32, initSize int) (unsafe.Pointer, error) {
 	n := uint32(initSize)
 	for {
 		b := make([]byte, n)
-		e := GetTokenInformation(t, class, &b[0], uint32(len(b)), &n)
+		e := GetTokenInformation(t, tclass, &b[0], uint32(len(b)), &n)
 		if e == nil {
 			return unsafe.Pointer(&b[0]), nil
 		}
