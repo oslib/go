@@ -1145,18 +1145,18 @@ func (pm *PtrMem) Copy(fn func(AST) AST, skip func(AST) bool) AST {
 	if skip(pm) {
 		return nil
 	}
-	class := pm.Class.Copy(fn, skip)
+	classt := pm.Class.Copy(fn, skip)
 	member := pm.Member.Copy(fn, skip)
-	if class == nil && member == nil {
+	if classt == nil && member == nil {
 		return fn(pm)
 	}
-	if class == nil {
-		class = pm.Class
+	if classt == nil {
+		classt = pm.Class
 	}
 	if member == nil {
 		member = pm.Member
 	}
-	pm = &PtrMem{Class: class, Member: member}
+	pm = &PtrMem{Class: classt, Member: member}
 	if r := fn(pm); r != nil {
 		return r
 	}

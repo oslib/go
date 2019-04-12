@@ -3,7 +3,7 @@ package main // src/hello/hello.go
  
 import . "fmt"
 import . "hellosub"
- 
+
 type C1 class {
     C1( s1 string )
     Huh() string
