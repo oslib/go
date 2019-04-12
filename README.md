@@ -11,7 +11,6 @@ Unless otherwise noted, the Go++ source files are distributed under the BSD-styl
 ### Download and Install
 
 To give Go++ a spin, you will need to download the source files from github and build a new version of the compilers and related tools. First, clone a copy of the guthub repository: 
-
 ```
 > git clone https://github.com/oslib/gopp.git go++
 ```
@@ -23,14 +22,13 @@ If a more current release has been made it will show at the top of the page, in 
 instructions. Once installed:
 ```
 make a copy of the "bin" and "pkg" subdirectories from the 1.12.3 binary distribution 
-and paste them into into your Go++ source directory, "go++" in this example. 
+pasting them into into your Go++ source directory, "go++" in this example. 
 ```
 Of course, this step is a little different on each platform, but is most easily performed with the local file explorer. The GOROOT environment variable should be set to the go++ directory and the GOPATH should be unset or set to some other path (it's considered an error to have these pointing to the same location).  
 ```
 > export GOROOT=~/go++  
 > export GOPATH= 
 ```
-
 The export command should work for Linux and Mac. On windows the "set" command would be used to accomplish the same result. On each platform these variable may be setup as permanent for each new session with GOROOT pointing to the go++ directory, and GOPATH set to whatever directory is being used for local development. The Go++ compiler should be fully backwards compatible and be able to compile any standard golang packages (with the exception of conflicts with new keywords added for the Go++ language). 
 
 The last step is to build the Go++ compiler and related tools: 
