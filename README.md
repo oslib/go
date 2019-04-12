@@ -1,44 +1,21 @@
 # The Go++ Programming Language
 
 Go++ is a derivative of the popular open source programming language that makes it easy to build simple,
-reliable, and efficient software.
+reliable, and efficient software, named go, and sometimes referred to as golang. The basic idea is to enhance the basic language with support for classes (sort of a hybrid between structs and interfaces), and to improve the usability and readability by adding new keywords and simplifying some of the syntax.     
 
-![Go++ image](doc/gopher/Go++.jpg)
+![Go++ image](doc/images/Go++.jpg)
 *Go++ image by [Glenn Fiedler]  [https://gafferongames.com/post/shape_of_the_go_stone].*
 
-Our canonical Git repository is located at https://go.googlesource.com/go.
-There is a mirror of the repository at https://github.com/golang/go.
-
-Unless otherwise noted, the Go source files are distributed under the
+Unless otherwise noted, the Go++ source files are distributed under the
 BSD-style license found in the LICENSE file.
 
 ### Download and Install
 
-#### Binary Distributions
+To give Go++ a spin, you will need to download the source files from github and build a new version of the compilers and related tools. First, clone a copy of the guthub repository: 
 
-Official binary distributions are available at https://golang.org/dl/.
+```
+> git clone https://github.com/oslib/gopp.git go++
+```
+This step is exactly the same on the three supported platforms, Linux, Mac, and Windows. The "go++" directory can be any local name or, if omitted, it will default to the git supported name "gopp" (git does not support the "++" special characters when naming repositories). 
 
-After downloading a binary release, visit https://golang.org/doc/install
-or load [doc/install.html](./doc/install.html) in your web browser for installation
-instructions.
 
-#### Install From Source
-
-If a binary distribution is not available for your combination of
-operating system and architecture, visit
-https://golang.org/doc/install/source or load [doc/install-source.html](./doc/install-source.html)
-in your web browser for source installation instructions.
-
-### Contributing
-
-Go is the work of thousands of contributors. We appreciate your help!
-
-To contribute, please read the contribution guidelines:
-	https://golang.org/doc/contribute.html
-
-Note that the Go project uses the issue tracker for bug reports and
-proposals only. See https://golang.org/wiki/Questions for a list of
-places to ask questions about the Go language.
-
-[rf]: https://reneefrench.blogspot.com/
-[cc3-by]: https://creativecommons.org/licenses/by/3.0/
