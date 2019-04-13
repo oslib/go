@@ -1,21 +1,21 @@
-go install -i cmd/compile
-go install -i cmd/link
-go install -i cmd/go
-go install -i cmd/addr2line 
-go install -i cmd/api 
-go install -i cmd/asm 
-go install -i cmd/buildid
-go install -i cmd/cgo
-go install -i cmd/cover
-go install -i cmd/dist
-go install -i cmd/doc
-go install -i cmd/fix
-go install -i cmd/gofmt
-go install -i cmd/nm
-go install -i cmd/objdump
-go install -i cmd/pack
-go install -i cmd/pprof
-go install -i cmd/test2json
-go install -i cmd/trace
-go install -i cmd/vet
+go install -i $1 cmd/compile
+go install -i $1 cmd/link
+go install -i $1 cmd/go
+go install -i $1 cmd/addr2line 
+go install -i $1 cmd/api 
+go install -i $1 cmd/asm 
+go install -i $1 cmd/buildid
+go install -i $1 cmd/cgo
+go install -i $1 cmd/cover
+go install -i $1 cmd/dist
+go install -i $1 cmd/doc
+go install -i $1 cmd/fix
+go install -i $1 cmd/gofmt
+go install -i $1 cmd/nm
+go install -i $1 cmd/objdump
+go install -i $1 cmd/pack
+go install -i $1 cmd/pprof
+go install -i $1 cmd/test2json
+go install -i $1 cmd/trace
+go install -i $1 cmd/vet
 

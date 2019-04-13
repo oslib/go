@@ -1,17 +1,20 @@
-
+          
 package hellosub // src/hellosub/hellosub.go 
 import . "fmt"
-
  
 type Hi interface { 
-    Init() 
-    Huh() string 
+    Init()
+    Huh() string
 }
-
 
 type Hello struct implements Hi { 
     str string 
 }
+
+
+func ( h *Hello ) Copy( fromh *Hello ) { 
+    h.str = fromh.str
+}  
 
 
 func (h *Hello) Init() { 
@@ -36,3 +39,13 @@ func (h *Hello) Huh() string {
     return h.str 
 } 
 
+
+var Test Hi 
+
+func init() { 
+    var hlo Hello = Hello{ "What?" }
+    var h2 Hello 
+
+    h2.Copy( &hlo ) 
+    Test = &h2   
+}  

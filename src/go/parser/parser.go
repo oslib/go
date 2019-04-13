@@ -742,7 +742,6 @@ func (p *parser) makeIdentList(list []ast.Expr) []*ast.Ident {
 }
 
 
-
 func (p *parser) parseFieldDecl(scope *ast.Scope) *ast.Field {
 	if p.trace {
 		defer un(trace(p, "FieldDecl"))
@@ -789,7 +788,7 @@ func (p *parser) parseFieldDecl(scope *ast.Scope) *ast.Field {
 
 	p.expectSemi() // call before accessing p.linecomment
 
-	field := &ast.Field{Doc: doc, Names: idents, Type: typ, Tag: tag, Comment: p.lineComment, Member: true}
+	field := &ast.Field{Doc: doc, Names: idents, Type: typ, Tag: tag, Comment: p.lineComment, Method: false}
 	p.declare(field, nil, scope, ast.Var, idents...)
 	p.resolve(typ)
 
@@ -1094,7 +1093,7 @@ func (p *parser) parseMethodSpec(scope *ast.Scope) *ast.Field {
 	}
 	p.expectSemi() // call before accessing p.linecomment
 
-	spec := &ast.Field{Doc: doc, Names: idents, Type: typ, Comment: p.lineComment, Member: false }
+	spec := &ast.Field{Doc: doc, Names: idents, Type: typ, Comment: p.lineComment, Method: true }
 	p.declare(spec, nil, scope, ast.Fun, idents...)
 
 	return spec

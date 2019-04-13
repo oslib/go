@@ -162,7 +162,7 @@ type Field struct {
 	Type    Expr          // field/method/parameter type
 	Tag     *BasicLit     // field tag; or nil
 	Comment *CommentGroup // line comments; or nil
-	Member  bool 
+	Method  bool 
 }
 
 func (f *Field) Pos() token.Pos {

@@ -454,7 +454,7 @@ func (p *printer) fieldList(fields *ast.FieldList, isIncomplete bool) {
 			// (don't use identList and ignore source line breaks)
 			p.print(lbrace, token.LBRACE, blank)
 			f := list[0]
-			if f.Member {
+			if ! f.Method {
 				for i, x := range f.Names {
 					if i > 0 {
 						// no comments so no need for comma position
@@ -494,7 +494,7 @@ func (p *printer) fieldList(fields *ast.FieldList, isIncomplete bool) {
 	var line int
 
 	for i, f := range list { 
-		if f.Member { 
+		if ! f.Method { 
 			if i > 0 {
 				p.linebreak(p.lineFor(f.Pos()), 1, ignore, p.linesFrom(line) > 0)
 			}
