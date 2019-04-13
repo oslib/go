@@ -212,6 +212,19 @@ func ( ti *TypeInfo ) TypeInfo( t *Type ) {
 } 
 
 
+func (ti *TypeInfo) Fmt() string { 
+	ret := "" 
+	if ti.IsPtr { 
+		ret += "*"
+	}
+    if ti.Pkg != nil { 
+		ret += ti.Pkg.Name + "."
+    } 
+	ret += ti.TypeName 
+	return ret 
+} 
+
+
 
 const (
 	typeNotInHeap  = 1 << iota // type cannot be heap allocated

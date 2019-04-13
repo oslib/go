@@ -2824,7 +2824,7 @@ func typecheckaste(op Op, call *Node, isddd bool, tstruct *types.Type, nl Nodes,
 					goto notenough
 				}
 				tn := rfs[i]
-				if assignop(tn.Type, tl.Type, &why) == 0 {
+				if assignop(tn.Type, tl.Type, &why) == 0 { 
 					if call != nil {
 						yyerror("cannot use %v as type %v in argument to %v%s", tn.Type, tl.Type, call, why)
 					} else {
@@ -2945,6 +2945,7 @@ toomany:
 		yyerror("too many arguments to %v%s", op, details)
 	}
 }
+
 
 func errorDetails(nl Nodes, tstruct *types.Type, isddd bool) string {
 	// If we don't know any type at a call site, let's suppress any return

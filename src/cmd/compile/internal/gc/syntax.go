@@ -62,8 +62,6 @@ type Node struct {
 	SynNode syntax.Node 
 	MyNoder *noder 
 	IsClass bool  
-//    ImpList []*ImpDecl 
-    DumpCode int 
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////

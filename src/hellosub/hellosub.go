@@ -1,4 +1,4 @@
-          
+               
 package hellosub // src/hellosub/hellosub.go 
 import . "fmt"
  
@@ -46,6 +46,6 @@ func init() {
     var hlo Hello = Hello{ "What?" }
     var h2 Hello 
 
-    h2.Copy( &hlo ) 
+    h2.Copy( hlo ) 
     Test = &h2   
 }  
