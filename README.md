@@ -18,8 +18,7 @@ This step is exactly the same on the three supported platforms, Linux, Mac, and 
 
 The next step is a short form of the golang bootstrap process. It starts with a binary installation of the standard golang environment, and must match the exact release version that was used as the initial branch fot G++ (currently 1.12.3). These files may be retrieved from the official binary distributions available at https://golang.org/dl/. 
 
-If a more current release has been made it will show at the top of the page, in which case you'll need an archived version which can be accessed via the link at the bottom of the main page. After downloading a binary release, visit https://golang.org/doc/install or load [doc/install.html](./doc/install.html) in your web browser for installation
-instructions. Once installed:
+If a more current release has been made it will show at the top of the page, in which case you'll need an archived version which can be accessed via the link at the bottom of the main page. After downloading a binary release, visit https://golang.org/doc/install for installation instructions. Once installed:
 ```
 make a copy of the "bin" and "pkg" subdirectories from the 1.12.3 binary distribution 
 pasting them into your Go++ source directory, "go++" in this example. 
