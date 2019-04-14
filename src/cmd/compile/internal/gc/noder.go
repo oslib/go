@@ -20,7 +20,6 @@ import (
 	"cmd/internal/src"
 )
 
-var debugflag bool 
 var classes map[ string ] bool  
 
 // parseFiles concurrently parses files into *syntax.File structures.
@@ -36,8 +35,6 @@ func parseFiles(filenames []string) uint {
 	sem := make(chan struct{}, runtime.GOMAXPROCS(0)+10)
 
 	for _, filename := range filenames {
-
-debugflag = strings.Contains( filename, "hello" ) 
 		p := &noder{
 			basemap: make(map[*syntax.PosBase]*src.PosBase),
 			err:     make(chan syntax.Error),

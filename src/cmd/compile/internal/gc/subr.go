@@ -815,13 +815,7 @@ func assignconvfn(n *Node, t *types.Type, context func() string) *Node {
 	if n == nil || n.Type == nil || n.Type.Broke() {
 		return n
 	}
-//if debugflag {
-//nt := n.Type  
-//fmt.Printf( "assignconvfn n=%v n.Op=%v  nt=%v  t=%v  Implicit=%t\n", n, n.Op, nt, t, n.Implicit() ) 
-//if n.Left != nil { 
-//	fmt.Printf(".....n.Left=%v  n.Left.Type=%v\n", n.Left, n.Left.Type )  
-//}
-//}
+
 	if t.Etype == TBLANK && n.Type.Etype == TNIL {
 		yyerror("use of untyped nil")
 	}
@@ -863,8 +857,22 @@ func assignconvfn(n *Node, t *types.Type, context func() string) *Node {
 	}
 
 	var why string
-	op := assignop(n.Type, t, &why)
+	op := assignop(n.Type, t, &why) 
+
 	if op == 0 {
+		if strings.Contains( why, "method has pointer receiver" ) { 
+			if ! n.Type.IsPtr() { 
+				newn := nod(OADDR, n, nil ) 
+				newn.Type = types.NewPtr( n.Type ) 
+				op = assignop( newn.Type, t, nil ) 
+				if op != 0 { 
+					n = newn 
+				}
+			}
+		}
+	}
+
+	if op == 0 { 
 		if !old.Diag() {
 			yyerror("Cannot use %L as type %v in %s%s", n, t, context(), why)
 		}

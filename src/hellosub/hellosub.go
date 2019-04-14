@@ -46,6 +46,6 @@ func init() {
     var hlo Hello = Hello{ "What?" }
     var h2 Hello 
 
-    h2.Copy( hlo ) 
-    Test = &h2   
+    h2.Copy( hlo ) // This is a golang error - Go++ let's it slide 
+    Test = h2  // Ditto here since Hello methods using pointer receivers 
 }  
