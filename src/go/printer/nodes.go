@@ -16,7 +16,7 @@ import (
 	"strconv"
 	"strings"
 	"unicode"
-	"unicode/utf8" 
+	"unicode/utf8"
 )
 
 // Formatting issues:
@@ -555,6 +555,7 @@ func (p *printer) fieldList(fields *ast.FieldList, isIncomplete bool) {
 
 /*
 	if isStruct {
+
 		sep := vtab
 		if len(list) == 1 {
 			sep = blank
@@ -627,11 +628,11 @@ func (p *printer) fieldList(fields *ast.FieldList, isIncomplete bool) {
 			p.flush(p.posFor(rbrace), token.RBRACE) // make sure we don't lose the last line comment
 			p.setLineComment("// contains filtered or unexported methods")
 		}
+
 	}
 	p.print(unindent, formfeed, rbrace, token.RBRACE)
 */
 }
-
 
 // ----------------------------------------------------------------------------
 // Expressions

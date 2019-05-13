@@ -3,7 +3,7 @@
 // license that can be found in the LICENSE file.
 
 package gc
- 
+
 import (
 	"cmd/compile/internal/ssa"
 	"cmd/compile/internal/types"

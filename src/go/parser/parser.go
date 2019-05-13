@@ -741,7 +741,6 @@ func (p *parser) makeIdentList(list []ast.Expr) []*ast.Ident {
 	return idents
 }
 
-
 func (p *parser) parseFieldDecl(scope *ast.Scope) *ast.Field {
 	if p.trace {
 		defer un(trace(p, "FieldDecl"))
@@ -794,7 +793,6 @@ func (p *parser) parseFieldDecl(scope *ast.Scope) *ast.Field {
 
 	return field
 }
-
 
 func (p *parser) parseStructType() *ast.StructType {
 	if p.trace {

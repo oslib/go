@@ -490,7 +490,6 @@ func (p *noder) declName(name *syntax.Name) *Node {
 	return n
 }
 
-
 func (p *noder) funcDecl(fun *syntax.FuncDecl) *Node {
 
 	if fun.Recv != nil && fun.Recv.Type != nil { // This is a method  
@@ -912,9 +911,6 @@ func (p *noder) interfaceType(expr *syntax.InterfaceType) *Node {
 	n := p.nod(expr, OTINTER, nil, nil)
 	n.List.Set(l)
 	n.IsClass = expr.IsClass 
-		
-//	n.SynNode = expr 
-//	n.MyNoder = p 
 	return n
 }
 

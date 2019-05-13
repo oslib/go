@@ -25,7 +25,7 @@ type abbrev struct {
 type afield struct {
 	attr  Attr
 	fmt   format
-	aclass Class
+	class Class
 }
 
 // a map from entry format ids to their descriptions
@@ -81,7 +81,7 @@ func (d *Data) parseAbbrev(off uint64, vers int) (abbrevTable, error) {
 		for i := range a.field {
 			a.field[i].attr = Attr(b.uint())
 			a.field[i].fmt = format(b.uint())
-			a.field[i].aclass = formToClass(a.field[i].fmt, a.field[i].attr, vers, &b)
+			a.field[i].class = formToClass(a.field[i].fmt, a.field[i].attr, vers, &b)
 		}
 		b.uint()
 		b.uint()
@@ -169,8 +169,8 @@ func formToClass(form format, attr Attr, vers int, b *buf) Class {
 		// DWARF 4 attributes need to distinguish Class*Ptr
 		// from ClassConstant, so we only do this promotion
 		// for versions 2 and 3.
-		if aclass, ok := attrPtrClass[attr]; vers < 4 && ok {
-			return aclass
+		if class, ok := attrPtrClass[attr]; vers < 4 && ok {
+			return class
 		}
 		return ClassConstant
 
@@ -190,8 +190,8 @@ func formToClass(form format, attr Attr, vers int, b *buf) Class {
 		// DWARF 4 defines four *ptr classes, but doesn't
 		// distinguish them in the encoding. Disambiguate
 		// these classes using the attribute.
-		if aclass, ok := attrPtrClass[attr]; ok {
-			return aclass
+		if class, ok := attrPtrClass[attr]; ok {
+			return class
 		}
 		return ClassUnknown
 
@@ -382,7 +382,7 @@ func (b *buf) entry(atab abbrevTable, ubase Offset) *Entry {
 	}
 	for i := range e.Field {
 		e.Field[i].Attr = a.field[i].attr
-		e.Field[i].Class = a.field[i].aclass
+		e.Field[i].Class = a.field[i].class
 		fmt := a.field[i].fmt
 		if fmt == formIndirect {
 			fmt = format(b.uint())

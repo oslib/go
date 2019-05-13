@@ -8,7 +8,7 @@
 // See also ``A Layman's Guide to a Subset of ASN.1, BER, and DER,''
 // http://luca.ntop.org/Teaching/Appunti/asn1.html.
 package asn1
- 
+
 // ASN.1 is a syntax for specifying abstract objects and BER, DER, PER, XER etc
 // are different encoding formats for those objects. Here, we'll be dealing
 // with DER, the Distinguished Encoding Rules. DER is used in X.509 because

@@ -1201,8 +1201,8 @@ func (p *parser) typeOrNil( name string ) Expr {
 	case _Struct:
 		return p.structType()
 
-	case _Interface: 
-		return p.interfaceType()  
+	case _Interface:
+		return p.interfaceType()
 
 	case _Class: 
 		return p.classType( name ) 
@@ -2200,6 +2200,7 @@ func (p *parser) stmtOrNil() Stmt {
 
 	case _For:
 		return p.forStmt( _For )
+
 	case _While: 
 		return p.forStmt( _While ) 
 
