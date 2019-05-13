@@ -16,7 +16,7 @@ To give Go++ a spin, you will need to download the source files from github and 
 ```
 This step is exactly the same on the three supported platforms, Linux, Mac, and Windows (basically, the only ones that have been tested). The "go++" directory, specified by the last parameter, can be any local name or, if omitted, it will default to the git supported name "gopp" (git does not allow the "++" special characters when naming repositories). 
 
-The next step is a short form of the golang bootstrap process. It starts with a binary installation of the standard golang environment, and must match the exact release version that was used as the initial branch fot G++ (currently 1.12.3). These files may be retrieved from the official binary distributions available at https://golang.org/dl/. 
+The next step is a short form of the golang bootstrap process. It starts with a binary installation of the standard golang environment, and must match the exact release version that was used as the initial branch fot G++ (currently 1.12.5). These files may be retrieved from the official binary distributions available at https://golang.org/dl/. 
 
 If a more current release has been made it will show at the top of the page, in which case you'll need an archived version which can be accessed via the link at the bottom of the main page. After downloading a binary release, visit https://golang.org/doc/install for installation instructions. Once installed:
 ```
